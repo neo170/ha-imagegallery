@@ -87,6 +87,9 @@ export class HaImageGalleryCard extends LitElement {
   private _tapStartX = 0;
   private _tapStartY = 0;
   private _tapCandidate = false;
+  private _lastTouchTapTime = 0;
+  private _lastTouchTapX = 0;
+  private _lastTouchTapY = 0;
 
   static styles = css`
     :host {
@@ -482,6 +485,7 @@ export class HaImageGalleryCard extends LitElement {
           @pointermove=${this._onOverlayPointerMove}
           @pointerup=${this._onOverlayPointerUp}
           @pointercancel=${this._onOverlayPointerUp}
+          @touchend=${this._onOverlayTouchEnd}
           @dblclick=${this._onImageDoubleTap}
         >
           <div class=${trackClass} style=${trackStyle}>
@@ -980,19 +984,7 @@ export class HaImageGalleryCard extends LitElement {
       }
 
       if (!wasSwiping && this._tapCandidate) {
-        const now = Date.now();
-        const dt = now - this._lastTapTime;
-        const dx = Math.abs(ev.clientX - this._lastTapX);
-        const dy = Math.abs(ev.clientY - this._lastTapY);
-
-        if (dt > 0 && dt < 320 && dx < 24 && dy < 24) {
-          this._onImageDoubleTap(ev);
-          this._lastTapTime = 0;
-        } else {
-          this._lastTapTime = now;
-          this._lastTapX = ev.clientX;
-          this._lastTapY = ev.clientY;
-        }
+        this._handlePointerDoubleTap(ev.clientX, ev.clientY, ev);
       }
 
       this._overlaySwipeDeltaX = 0;
@@ -1002,6 +994,44 @@ export class HaImageGalleryCard extends LitElement {
     if (this._scale <= 1) {
       this._offsetX = 0;
       this._offsetY = 0;
+    }
+  };
+
+  private _onOverlayTouchEnd = (ev: TouchEvent): void => {
+    const touch = ev.changedTouches[0];
+    if (!touch) {
+      return;
+    }
+
+    const now = Date.now();
+    const dt = now - this._lastTouchTapTime;
+    const dx = Math.abs(touch.clientX - this._lastTouchTapX);
+    const dy = Math.abs(touch.clientY - this._lastTouchTapY);
+
+    if (dt > 0 && dt < 320 && dx < 24 && dy < 24) {
+      ev.preventDefault();
+      this._onImageDoubleTap(ev);
+      this._lastTouchTapTime = 0;
+    } else {
+      this._lastTouchTapTime = now;
+      this._lastTouchTapX = touch.clientX;
+      this._lastTouchTapY = touch.clientY;
+    }
+  };
+
+  private _handlePointerDoubleTap = (x: number, y: number, ev?: Event): void => {
+    const now = Date.now();
+    const dt = now - this._lastTapTime;
+    const dx = Math.abs(x - this._lastTapX);
+    const dy = Math.abs(y - this._lastTapY);
+
+    if (dt > 0 && dt < 320 && dx < 24 && dy < 24) {
+      this._onImageDoubleTap(ev);
+      this._lastTapTime = 0;
+    } else {
+      this._lastTapTime = now;
+      this._lastTapX = x;
+      this._lastTapY = y;
     }
   };
 
