@@ -114,6 +114,17 @@ export class HaImageGalleryCard extends LitElement {
   private _lastCardSlideChangeAt = 0;
   private _syncingSwiperIndex = false;
 
+  private _isIOSLikeDevice(): boolean {
+    if (typeof navigator === "undefined") {
+      return false;
+    }
+
+    const ua = navigator.userAgent ?? "";
+    const isAppleMobile = /iP(hone|ad|od)/i.test(ua);
+    const iPadDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    return isAppleMobile || iPadDesktopMode;
+  }
+
   static styles = css`
     :host {
       display: block;
@@ -482,10 +493,13 @@ export class HaImageGalleryCard extends LitElement {
       return html`<div class="center">Keine Bilder gefunden</div>`;
     }
 
+    const useCssMode = this._isIOSLikeDevice() ? "true" : "false";
+
     return html`
       <swiper-container
         class="card-swiper"
         slides-per-view="1"
+        css-mode=${useCssMode}
         speed="260"
         rewind="true"
         resistance-ratio="0.15"
@@ -510,6 +524,7 @@ export class HaImageGalleryCard extends LitElement {
 
   private _renderDialog(): TemplateResult {
     const currentImage = this._images[this._index];
+    const allowFullscreenSwipe = this._isIOSLikeDevice() ? "false" : "true";
 
     return html`
       <div class="overlay" @wheel=${this._onDialogWheelZoom}>
@@ -525,6 +540,8 @@ export class HaImageGalleryCard extends LitElement {
             speed="260"
             rewind="true"
             zoom="true"
+            allow-touch-move=${allowFullscreenSwipe}
+            simulate-touch=${allowFullscreenSwipe}
             resistance-ratio="0.15"
             threshold="3"
             long-swipes-ratio="0.18"
