@@ -43,6 +43,9 @@ The integration exposes API endpoint:
 
 The card reads this endpoint first. If backend integration is not installed, it falls back to index.json/directory listing.
 
+No `index.json` file is required when backend integration is active.
+The image index is kept in memory and updated by filesystem events.
+
 Resource URL after HACS install (if not auto-added):
 
 ```text

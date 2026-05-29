@@ -132,9 +132,7 @@ class ImageListView(HomeAssistantView):
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    conf = config.get(DOMAIN)
-    if conf is None:
-        return True
+    conf = config.get(DOMAIN, {})
 
     snapshot_dir_config = conf.get("snapshot_dir", DEFAULT_SNAPSHOT_DIR).replace("\\", "/")
     snapshot_dir = snapshot_dir_config if os.path.isabs(snapshot_dir_config) else hass.config.path(snapshot_dir_config)

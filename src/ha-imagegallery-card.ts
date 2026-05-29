@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 interface HomeAssistant {
   locale: { language: string };
+  callApi?: (method: string, path: string) => Promise<unknown>;
 }
 
 interface ImageGalleryCardConfig {
@@ -17,6 +18,11 @@ interface ImageGalleryCardConfig {
 interface DiscoveryResult {
   images: string[];
   reason?: string;
+}
+
+interface BackendFetchResult {
+  images: string[];
+  success: boolean;
 }
 
 type PointerMap = Map<number, { x: number; y: number }>;
@@ -357,8 +363,11 @@ export class HaImageGalleryCard extends LitElement {
         const folder = this._config.folder ?? "/local/snapshots";
 
         const fromIntegration = await this._fetchImagesFromIntegration(folder);
-        if (fromIntegration.length > 0) {
-          images = fromIntegration;
+        if (fromIntegration.success) {
+          images = fromIntegration.images;
+          if (!images.length) {
+            this._error = "Keine Bilder im ueberwachten Snapshot-Ordner gefunden.";
+          }
         } else {
           const result = await this._discoverImagesFromFolder(folder);
           images = result.images;
@@ -397,32 +406,32 @@ export class HaImageGalleryCard extends LitElement {
     }
   }
 
-  private async _fetchImagesFromIntegration(folder: string): Promise<string[]> {
+  private async _fetchImagesFromIntegration(folder: string): Promise<BackendFetchResult> {
     const normalizedFolder = this._normalizeFolder(folder);
-    const url = `/api/ha_imagegallery/images?folder=${encodeURIComponent(normalizedFolder)}`;
+    const path = `ha_imagegallery/images?folder=${encodeURIComponent(normalizedFolder)}`;
 
     try {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) {
-        return [];
-      }
+      const payload = this.hass?.callApi
+        ? ((await this.hass.callApi("GET", path)) as unknown)
+        : ((await (await fetch(`/api/${path}`, { cache: "no-store" })).json()) as unknown);
 
-      const payload = (await response.json()) as unknown;
       if (!payload || typeof payload !== "object") {
-        return [];
+        return { images: [], success: false };
       }
 
       const images = (payload as { images?: unknown }).images;
       if (!Array.isArray(images)) {
-        return [];
+        return { images: [], success: true };
       }
 
-      return images
+      const mapped = images
         .filter((entry): entry is string => typeof entry === "string")
         .map((entry) => this._normalizeImageUrl(entry))
         .filter((entry) => this._isImagePath(entry));
+
+      return { images: mapped, success: true };
     } catch {
-      return [];
+      return { images: [], success: false };
     }
   }
 
