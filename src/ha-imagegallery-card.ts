@@ -80,6 +80,10 @@ export class HaImageGalleryCard extends LitElement {
   private _swipeDirection: 'left' | 'right' | null = null;
   private _overlaySwipeStartX = 0;
   private _overlaySwipeDeltaX = 0;
+  private _overlayIsSwiping = false;
+  private _lastTapTime = 0;
+  private _lastTapX = 0;
+  private _lastTapY = 0;
 
   static styles = css`
     :host {
@@ -255,7 +259,33 @@ export class HaImageGalleryCard extends LitElement {
       touch-action: none;
     }
 
-    .overlay-stage img {
+    .overlay-track {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      transition: transform 0.22s ease-out;
+      will-change: transform;
+      pointer-events: none;
+    }
+
+    .overlay-track.no-transition {
+      transition: none;
+    }
+
+    .overlay-slide {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      flex: 0 0 100%;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .overlay-slide img {
       max-width: 100%;
       max-height: 100%;
       transform: translate(var(--x), var(--y)) scale(var(--s));
@@ -266,7 +296,7 @@ export class HaImageGalleryCard extends LitElement {
       pointer-events: auto;
     }
 
-    .overlay-stage img.no-transition {
+    .overlay-slide img.no-transition {
       transition: none;
     }
 
@@ -425,7 +455,16 @@ export class HaImageGalleryCard extends LitElement {
 
   private _renderDialog(): TemplateResult {
     const currentImage = this._images[this._index];
-    const style = `--s:${this._scale};--x:${this._offsetX}px;--y:${this._offsetY}px;`;
+    const prevIndex = (this._index - 1 + this._images.length) % this._images.length;
+    const nextIndex = (this._index + 1) % this._images.length;
+    const swipeShift = this._scale <= 1 ? this._overlaySwipeDeltaX : 0;
+    const trackStyle = `transform: translateX(${swipeShift}px);`;
+
+    const prevImageStyle = `--s:1;--x:0px;--y:0px;`;
+    const currentImageStyle = `--s:${this._scale};--x:${this._offsetX}px;--y:${this._offsetY}px;`;
+    const nextImageStyle = `--s:1;--x:0px;--y:0px;`;
+    const currentImageClass = this._scale > 1 || this._overlayIsSwiping ? "no-transition" : "";
+    const trackClass = this._overlayIsSwiping ? "overlay-track no-transition" : "overlay-track";
 
     return html`
       <div class="overlay" @wheel=${this._onWheelZoom}>
@@ -440,8 +479,19 @@ export class HaImageGalleryCard extends LitElement {
           @pointermove=${this._onOverlayPointerMove}
           @pointerup=${this._onOverlayPointerUp}
           @pointercancel=${this._onOverlayPointerUp}
+          @dblclick=${this._onImageDoubleTap}
         >
-          <img src=${currentImage} alt="Fullscreen image" style=${style} draggable="false" @dblclick=${this._onImageDoubleTap} />
+          <div class=${trackClass} style=${trackStyle}>
+            <div class="overlay-slide">
+              <img src=${this._images[prevIndex]} alt="Vorheriges Bild" style=${prevImageStyle} draggable="false" />
+            </div>
+            <div class="overlay-slide">
+              <img src=${currentImage} alt="Fullscreen image" style=${currentImageStyle} class=${currentImageClass} draggable="false" />
+            </div>
+            <div class="overlay-slide">
+              <img src=${this._images[nextIndex]} alt="Naechstes Bild" style=${nextImageStyle} draggable="false" />
+            </div>
+          </div>
         </div>
 
         <div class="overlay-bottom">
@@ -831,6 +881,22 @@ export class HaImageGalleryCard extends LitElement {
 
     this._activePointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
+    if (this._activePointers.size === 1 && this._scale <= 1) {
+      const now = Date.now();
+      const dt = now - this._lastTapTime;
+      const dx = Math.abs(ev.clientX - this._lastTapX);
+      const dy = Math.abs(ev.clientY - this._lastTapY);
+
+      if (dt > 0 && dt < 320 && dx < 24 && dy < 24) {
+        this._onImageDoubleTap(ev);
+        this._lastTapTime = 0;
+      } else {
+        this._lastTapTime = now;
+        this._lastTapX = ev.clientX;
+        this._lastTapY = ev.clientY;
+      }
+    }
+
     if (this._activePointers.size === 2) {
       const [a, b] = Array.from(this._activePointers.values());
       this._pinchStartDistance = this._distance(a, b);
@@ -854,6 +920,7 @@ export class HaImageGalleryCard extends LitElement {
         // Track horizontal swipe for image navigation at 1x zoom
         this._overlaySwipeStartX = ev.clientX;
         this._overlaySwipeDeltaX = 0;
+        this._overlayIsSwiping = true;
       }
     }
   };
@@ -887,7 +954,8 @@ export class HaImageGalleryCard extends LitElement {
     } else if (this._activePointers.size === 1 && this._scale <= 1) {
       // Horizontal swipe for navigation at 1x zoom
       this._overlaySwipeDeltaX = ev.clientX - this._overlaySwipeStartX;
-      this._offsetX = this._overlaySwipeDeltaX * 0.5;
+      this._offsetX = 0;
+      this._offsetY = 0;
     }
   };
 
@@ -900,9 +968,10 @@ export class HaImageGalleryCard extends LitElement {
 
     if (this._activePointers.size === 0) {
       this._dragging = false;
+      this._overlayIsSwiping = false;
 
       // Handle horizontal swipe for image navigation at 1x zoom
-      if (this._scale <= 1 && Math.abs(this._overlaySwipeDeltaX) > 30) {
+      if (this._scale <= 1 && Math.abs(this._overlaySwipeDeltaX) > 60) {
         if (this._overlaySwipeDeltaX < 0) {
           this._showNext();
         } else {
@@ -955,8 +1024,11 @@ export class HaImageGalleryCard extends LitElement {
     }
   };
 
-  private _onImageDoubleTap = (): void => {
-    this._resetZoom();
+  private _onImageDoubleTap = (ev?: Event): void => {
+    ev?.stopPropagation();
+    if (this._scale > 1) {
+      this._resetZoom();
+    }
   };
 
   private _distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
