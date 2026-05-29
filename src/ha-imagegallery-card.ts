@@ -459,7 +459,10 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     if (changedProps.has("_dialogOpen") || changedProps.has("_images")) {
-      this._syncSwipersToIndex();
+      // Don't reposition the dialog swiper when images refresh while it's already open;
+      // the user may be mid-navigation and an instant slideTo(0) would abort their swipe.
+      const syncDialog = changedProps.has("_dialogOpen") || !this._dialogOpen;
+      this._syncSwipersToIndex(syncDialog);
     }
   }
 
@@ -917,15 +920,16 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onDialogSlideGesture = (ev: Event): void => {
-    // Intentionally no state update here: rerendering during swipe causes visible overlay/jump on iOS.
-    const swiper = this._getSwiperFromEvent(ev);
-    if (!swiper) {
+    // Update index on slideChange so _index stays current between transitionend calls.
+    const swiper = this._getSwiperFromEvent(ev) ?? this._getDialogSwiper();
+    if (!swiper || this._syncingSwiperIndex) {
       return;
     }
+    this._index = swiper.realIndex ?? swiper.activeIndex ?? 0;
   };
 
   private _onDialogSlideTransitionEnd = (ev: Event): void => {
-    const swiper = this._getSwiperFromEvent(ev);
+    const swiper = this._getSwiperFromEvent(ev) ?? this._getDialogSwiper();
     if (!swiper || this._syncingSwiperIndex) {
       return;
     }
@@ -952,7 +956,7 @@ export class HaImageGalleryCard extends LitElement {
     return this._dialogOpen ? this._getDialogSwiper() : this._getCardSwiper();
   }
 
-  private _syncSwipersToIndex(): void {
+  private _syncSwipersToIndex(includeDialog = true): void {
     const card = this._getCardSwiper();
     const dialog = this._getDialogSwiper();
     this._syncingSwiperIndex = true;
@@ -965,7 +969,7 @@ export class HaImageGalleryCard extends LitElement {
       }
     }
 
-    if (dialog) {
+    if (includeDialog && dialog) {
       if (typeof dialog.slideTo === "function") {
         dialog.slideTo(this._index, 0, false);
       }
