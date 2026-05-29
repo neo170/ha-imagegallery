@@ -288,7 +288,7 @@ export class HaImageGalleryCard extends LitElement {
       z-index: 12000;
       display: grid;
       grid-template-rows: auto 1fr auto;
-      touch-action: none;
+      touch-action: pan-x;
       overscroll-behavior: contain;
     }
 
@@ -309,7 +309,7 @@ export class HaImageGalleryCard extends LitElement {
       min-height: 0;
       padding: 0 10px;
       box-sizing: border-box;
-      touch-action: none;
+      touch-action: pan-x;
     }
 
     .overlay-track {
@@ -553,8 +553,8 @@ export class HaImageGalleryCard extends LitElement {
           <swiper-container
             class="dialog-swiper"
             slides-per-view="1"
-            css-mode="false"
-            speed=${this._isIOSLikeDevice() ? "0" : "260"}
+            css-mode=${this._isIOSLikeDevice() ? "true" : "false"}
+            speed="260"
             loop="false"
             rewind="false"
             zoom="true"
@@ -569,8 +569,8 @@ export class HaImageGalleryCard extends LitElement {
             follow-finger="true"
             preload-images="true"
             touch-release-on-edges="false"
-            edge-swipe-detection="prevent"
-            edge-swipe-threshold="80"
+            long-swipes-ratio="0.18"
+            long-swipes-ms="180"
             @swiperslidechange=${this._onDialogSlideGesture}
             @swipertransitionend=${this._onDialogSlideTransitionEnd}
           >
