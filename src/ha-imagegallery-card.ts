@@ -601,7 +601,7 @@ export class HaImageGalleryCard extends LitElement {
                 <swiper-slide class="dialog-slide">
                   <img src=${src} alt="Fullscreen image" loading="eager" draggable="false"
                     style=${src === currentImage
-                      ? `transform: translate(${this._offsetX}px, ${this._offsetY}px) scale(${this._scale})`
+                      ? `transform: translate3d(${this._offsetX}px, ${this._offsetY}px, 0) scale(${this._scale})`
                       : ''}
                   />
                 </swiper-slide>

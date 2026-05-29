@@ -108,7 +108,7 @@ var os=Object.defineProperty;var ls=Object.getOwnPropertyDescriptor;var J=(e,s,t
             ${this._images.map(i=>le`
                 <swiper-slide class="dialog-slide">
                   <img src=${i} alt="Fullscreen image" loading="eager" draggable="false"
-                    style=${i===t?`transform: translate(${this._offsetX}px, ${this._offsetY}px) scale(${this._scale})`:""}
+                    style=${i===t?`transform: translate3d(${this._offsetX}px, ${this._offsetY}px, 0) scale(${this._scale})`:""}
                   />
                 </swiper-slide>
               `)}
