@@ -77,6 +77,7 @@ export class HaImageGalleryCard extends LitElement {
 
   private _zoomAnimationTimer?: number;
   private _refreshTimer?: number;
+  private _savedThemeColor?: string | null;
   private _touchStartX = 0;
   private _touchStartY = 0;
   private _touchStartTime = 0;
@@ -462,6 +463,31 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   protected willUpdate(changedProps: PropertyValues): void {
+    if (changedProps.has("_dialogOpen")) {
+      if (this._dialogOpen) {
+        // Darken the iOS status-bar (Dynamic Island area) to match the overlay background
+        const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        this._savedThemeColor = meta ? meta.content : undefined;
+        if (meta) {
+          meta.content = "rgb(5,11,18)";
+        } else {
+          const m = document.createElement("meta");
+          m.name = "theme-color";
+          m.content = "rgb(5,11,18)";
+          document.head.appendChild(m);
+          this._savedThemeColor = null; // null = we created it, must remove
+        }
+      } else {
+        // Restore original theme-color
+        const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+        if (this._savedThemeColor === null) {
+          meta?.remove();
+        } else if (meta && this._savedThemeColor !== undefined) {
+          meta.content = this._savedThemeColor;
+        }
+        this._savedThemeColor = undefined;
+      }
+    }
     if (changedProps.has("_dialogOpen") && !this._dialogOpen) {
       this._resetZoom();
     }
