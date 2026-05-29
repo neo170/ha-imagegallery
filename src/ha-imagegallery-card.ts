@@ -172,7 +172,7 @@ export class HaImageGalleryCard extends LitElement {
       height: 100%;
       display: grid;
       place-items: center;
-      overflow: hidden;
+      overflow: visible;
       background: rgba(0, 0, 0, 0.14);
     }
 
@@ -191,14 +191,12 @@ export class HaImageGalleryCard extends LitElement {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
+      transform-origin: center center;
+      will-change: transform;
     }
 
-    .dialog-slide .swiper-zoom-container {
-      width: 100%;
-      height: 100%;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
+    .overlay-stage.zoom-locked {
+      touch-action: none;
     }
 
     .viewport-track {
@@ -552,7 +550,11 @@ export class HaImageGalleryCard extends LitElement {
           <div>${this._getFileName(currentImage)}</div>
         </div>
 
-        <div class="overlay-stage">
+        <div class="overlay-stage ${this._scale > 1 ? 'zoom-locked' : ''}"
+          @touchstart=${this._onDialogZoomTouchStart}
+          @touchmove=${this._onDialogZoomTouchMove}
+          @touchend=${this._onDialogZoomTouchEnd}
+        >
           <swiper-container
             class="dialog-swiper"
             slides-per-view="1"
@@ -560,10 +562,6 @@ export class HaImageGalleryCard extends LitElement {
             speed="260"
             loop="false"
             rewind="false"
-            zoom="true"
-            zoom-max-ratio="4"
-            zoom-min-ratio="1"
-            zoom-toggle="false"
             allow-touch-move="true"
             simulate-touch="true"
             resistance="false"
@@ -580,9 +578,11 @@ export class HaImageGalleryCard extends LitElement {
             ${this._images.map(
               (src) => html`
                 <swiper-slide class="dialog-slide">
-                  <div class="swiper-zoom-container">
-                    <img src=${src} alt="Fullscreen image" loading="eager" draggable="false" />
-                  </div>
+                  <img src=${src} alt="Fullscreen image" loading="eager" draggable="false"
+                    style=${src === currentImage && (this._scale !== 1 || this._offsetX !== 0 || this._offsetY !== 0)
+                      ? `transform: translate(${this._offsetX}px, ${this._offsetY}px) scale(${this._scale})`
+                      : ''}
+                  />
                 </swiper-slide>
               `
             )}
@@ -920,12 +920,15 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onDialogSlideGesture = (ev: Event): void => {
-    // Update index on slideChange so _index stays current between transitionend calls.
     const swiper = this._getSwiperFromEvent(ev) ?? this._getDialogSwiper();
     if (!swiper || this._syncingSwiperIndex) {
       return;
     }
-    this._index = swiper.realIndex ?? swiper.activeIndex ?? 0;
+    const newIndex = swiper.realIndex ?? swiper.activeIndex ?? 0;
+    if (newIndex !== this._index && this._scale > 1) {
+      this._resetZoom();
+    }
+    this._index = newIndex;
   };
 
   private _onDialogSlideTransitionEnd = (ev: Event): void => {
@@ -1007,8 +1010,6 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _closeDialog = (): void => {
-    const dialogSwiper = this._getDialogSwiper();
-    dialogSwiper?.zoom?.out();
     this._dialogOpen = false;
     this._activePointers.clear();
     this._dragging = false;
@@ -1408,15 +1409,13 @@ export class HaImageGalleryCard extends LitElement {
 
   private _onImageDoubleTap = (ev?: Event): void => {
     ev?.stopPropagation();
-    const dialogSwiper = this._getDialogSwiper();
-    const currentScale = dialogSwiper?.zoom?.scale ?? 1;
-    if (currentScale > 1) {
-      dialogSwiper?.zoom?.out();
-      return;
-    }
-
     if (this._scale > 1) {
       this._resetZoom();
+    } else {
+      this._scale = 2;
+      this._offsetX = 0;
+      this._offsetY = 0;
+      this.requestUpdate();
     }
   };
 
@@ -1424,17 +1423,66 @@ export class HaImageGalleryCard extends LitElement {
     if (!this._dialogOpen || !ev.ctrlKey) {
       return;
     }
-
     ev.preventDefault();
-    const dialogSwiper = this._getDialogSwiper();
-    if (!dialogSwiper?.zoom) {
-      return;
-    }
-
-    if (ev.deltaY < 0) {
-      dialogSwiper.zoom.in();
+    const factor = ev.deltaY < 0 ? 1.15 : 0.87;
+    const newScale = this._clamp(this._scale * factor, 1, 4);
+    if (newScale <= 1.02) {
+      this._resetZoom();
     } else {
-      dialogSwiper.zoom.out();
+      this._scale = newScale;
+      this.requestUpdate();
+    }
+  };
+
+  private _onDialogZoomTouchStart = (ev: TouchEvent): void => {
+    if (!this._dialogOpen) return;
+
+    if (ev.touches.length === 2) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const t1 = ev.touches[0]!;
+      const t2 = ev.touches[1]!;
+      this._pinchStartDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      this._pinchStartScale = this._scale;
+    } else if (ev.touches.length === 1 && this._scale > 1) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const t = ev.touches[0]!;
+      this._dragStartPointerX = t.clientX;
+      this._dragStartPointerY = t.clientY;
+      this._dragStartOffsetX = this._offsetX;
+      this._dragStartOffsetY = this._offsetY;
+    }
+  };
+
+  private _onDialogZoomTouchMove = (ev: TouchEvent): void => {
+    if (!this._dialogOpen) return;
+
+    if (ev.touches.length === 2 && this._pinchStartDistance > 0) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const t1 = ev.touches[0]!;
+      const t2 = ev.touches[1]!;
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      this._scale = this._clamp(this._pinchStartScale * (dist / this._pinchStartDistance), 1, 4);
+      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+      stage?.classList.toggle("zoom-locked", this._scale > 1);
+      this.requestUpdate();
+    } else if (ev.touches.length === 1 && this._scale > 1) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const t = ev.touches[0]!;
+      this._offsetX = this._dragStartOffsetX + (t.clientX - this._dragStartPointerX);
+      this._offsetY = this._dragStartOffsetY + (t.clientY - this._dragStartPointerY);
+      this.requestUpdate();
+    }
+  };
+
+  private _onDialogZoomTouchEnd = (_ev: TouchEvent): void => {
+    if (this._scale < 1.05) {
+      this._resetZoom();
+      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+      stage?.classList.remove("zoom-locked");
     }
   };
 
