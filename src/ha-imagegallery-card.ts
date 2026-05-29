@@ -11,6 +11,7 @@ interface ImageGalleryCardConfig {
   folder?: string;
   images?: string[];
   refresh_interval?: number;
+  sort?: "newest_first" | "oldest_first" | "none";
 }
 
 interface DiscoveryResult {
@@ -225,6 +226,8 @@ export class HaImageGalleryCard extends LitElement {
 
     this._config = {
       folder: "/local/snapshots",
+      refresh_interval: 15,
+      sort: "newest_first",
       ...config
     };
 
@@ -351,16 +354,39 @@ export class HaImageGalleryCard extends LitElement {
       if (configured.length > 0) {
         images = configured.map((entry) => this._normalizeImageUrl(entry));
       } else {
-        const result = await this._discoverImagesFromFolder(this._config.folder ?? "/local/snapshots");
-        images = result.images;
-        if (!images.length && result.reason) {
-          this._error = result.reason;
+        const folder = this._config.folder ?? "/local/snapshots";
+
+        const fromIntegration = await this._fetchImagesFromIntegration(folder);
+        if (fromIntegration.length > 0) {
+          images = fromIntegration;
+        } else {
+          const result = await this._discoverImagesFromFolder(folder);
+          images = result.images;
+          if (!images.length && result.reason) {
+            this._error = result.reason;
+          }
         }
       }
 
-      this._images = images;
-      if (this._index >= this._images.length) {
-        this._index = Math.max(0, this._images.length - 1);
+      const sortedImages = this._sortImages(images);
+      const previousImages = this._images;
+      const previousCurrent = previousImages[this._index];
+      const previousFirst = previousImages[0];
+
+      this._images = sortedImages;
+
+      if (!this._images.length) {
+        this._index = 0;
+      } else {
+        const newestChanged = previousFirst !== this._images[0];
+        if (newestChanged) {
+          this._index = 0;
+        } else if (previousCurrent) {
+          const sameImageIndex = this._images.indexOf(previousCurrent);
+          this._index = sameImageIndex >= 0 ? sameImageIndex : 0;
+        } else if (this._index >= this._images.length) {
+          this._index = Math.max(0, this._images.length - 1);
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
@@ -368,6 +394,35 @@ export class HaImageGalleryCard extends LitElement {
       this._images = [];
     } finally {
       this._loading = false;
+    }
+  }
+
+  private async _fetchImagesFromIntegration(folder: string): Promise<string[]> {
+    const normalizedFolder = this._normalizeFolder(folder);
+    const url = `/api/ha_imagegallery/images?folder=${encodeURIComponent(normalizedFolder)}`;
+
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        return [];
+      }
+
+      const payload = (await response.json()) as unknown;
+      if (!payload || typeof payload !== "object") {
+        return [];
+      }
+
+      const images = (payload as { images?: unknown }).images;
+      if (!Array.isArray(images)) {
+        return [];
+      }
+
+      return images
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => this._normalizeImageUrl(entry))
+        .filter((entry) => this._isImagePath(entry));
+    } catch {
+      return [];
     }
   }
 
@@ -468,6 +523,57 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     return mapped.replace(/\s/g, "%20");
+  }
+
+  private _sortImages(images: string[]): string[] {
+    const uniqueImages = Array.from(new Set(images));
+    const sortMode = this._config?.sort ?? "newest_first";
+    if (sortMode === "none") {
+      return uniqueImages;
+    }
+
+    const direction = sortMode === "oldest_first" ? 1 : -1;
+
+    return [...uniqueImages].sort((left, right) => {
+      const leftTime = this._extractTimestampFromPath(left);
+      const rightTime = this._extractTimestampFromPath(right);
+
+      if (leftTime !== undefined && rightTime !== undefined && leftTime !== rightTime) {
+        return (leftTime - rightTime) * direction;
+      }
+
+      const byName = left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+      return byName * direction;
+    });
+  }
+
+  private _extractTimestampFromPath(pathValue: string): number | undefined {
+    const source = decodeURIComponent((pathValue.split("?")[0] ?? pathValue).toLowerCase());
+    const fileName = source.split("/").pop() ?? source;
+
+    const unixMatch = fileName.match(/(^|\D)(\d{10,13})(\D|$)/);
+    if (unixMatch?.[2]) {
+      const raw = Number(unixMatch[2]);
+      if (Number.isFinite(raw)) {
+        return unixMatch[2].length === 13 ? raw : raw * 1000;
+      }
+    }
+
+    const dtMatch = fileName.match(/(\d{4})[-_]?([01]\d)[-_]?([0-3]\d)[t _-]?([0-2]\d)?[:_-]?([0-5]\d)?[:_-]?([0-5]\d)?/i);
+    if (dtMatch) {
+      const year = Number(dtMatch[1]);
+      const month = Number(dtMatch[2]);
+      const day = Number(dtMatch[3]);
+      const hour = Number(dtMatch[4] ?? "0");
+      const minute = Number(dtMatch[5] ?? "0");
+      const second = Number(dtMatch[6] ?? "0");
+      const ts = new Date(year, month - 1, day, hour, minute, second).getTime();
+      if (!Number.isNaN(ts)) {
+        return ts;
+      }
+    }
+
+    return undefined;
   }
 
   private _resolveFolderEntry(folder: string, entry: string): string {
@@ -687,7 +793,7 @@ export class HaImageGalleryCard extends LitElement {
   private _restartRefreshTimer(): void {
     this._clearRefreshTimer();
 
-    const intervalSeconds = this._config?.refresh_interval;
+    const intervalSeconds = this._config?.refresh_interval ?? 15;
     if (!intervalSeconds || intervalSeconds < 5) {
       return;
     }

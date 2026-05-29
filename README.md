@@ -1,6 +1,6 @@
 # HA Image Gallery Card
 
-Custom Lovelace card for Home Assistant that shows images from `/www/snapshots` (served as `/local/snapshots`) with swipe navigation and fullscreen pinch-to-zoom.
+Custom Lovelace card for Home Assistant with backend folder monitoring. The integration watches `/config/www/snapshots`, builds an internal image list, and the card reads that list via API.
 
 ## Features
 
@@ -10,6 +10,8 @@ Custom Lovelace card for Home Assistant that shows images from `/www/snapshots` 
 - Pinch-to-zoom on touch devices
 - Mouse wheel zoom on desktop
 - Drag to pan while zoomed
+- Backend folder watcher (watchdog) for new files
+- Internal image index sorted by file mtime (newest first)
 
 ## Installation (HACS)
 
@@ -20,6 +22,26 @@ Custom Lovelace card for Home Assistant that shows images from `/www/snapshots` 
 3. Install **HA Image Gallery** through HACS.
 4. Restart Home Assistant.
 5. Add the card in Lovelace.
+
+## Backend Integration Setup (required for folder watch)
+
+Copy folder `custom_components/ha_imagegallery` into your Home Assistant config directory and add this to `configuration.yaml`:
+
+```yaml
+ha_imagegallery:
+  snapshot_dir: www/snapshots
+  url_prefix: /local/snapshots
+```
+
+Then restart Home Assistant.
+
+The integration exposes API endpoint:
+
+```text
+/api/ha_imagegallery/images
+```
+
+The card reads this endpoint first. If backend integration is not installed, it falls back to index.json/directory listing.
 
 Resource URL after HACS install (if not auto-added):
 
@@ -58,6 +80,7 @@ type: custom:ha-imagegallery-card
 title: Kamera Snapshots
 folder: /local/snapshots
 refresh_interval: 60
+sort: newest_first
 ```
 
 ### Explicit image list (optional)
@@ -94,6 +117,19 @@ or
 - Place images under `config/www/snapshots` in Home Assistant.
 - Files in `/www` are available under `/local` in the frontend.
 - Supported extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.bmp`.
+- Default behavior: backend integration updates internal list on filesystem events; card refreshes view and jumps to the newest image when list changes.
+
+## Sorting
+
+- `sort: newest_first` (default) shows newest image first.
+- `sort: oldest_first` shows chronological order from oldest to newest.
+- `sort: none` keeps source order.
+
+Timestamp detection for sorting uses common filename patterns, for example:
+
+- `snapshot_2026-05-29_16-45-30.jpg`
+- `cam_20260529_164530.jpg`
+- `image_1748537130.jpg` (unix timestamp)
 
 ## Troubleshooting: "Keine Bilder gefunden"
 
