@@ -49,6 +49,8 @@ type: custom:ha-imagegallery-card
 folder: /local/snapshots
 ```
 
+Important: use frontend path `/local/...` in card config, not `/config/www/...`.
+
 ### With options
 
 ```yaml
@@ -92,6 +94,20 @@ or
 - Place images under `config/www/snapshots` in Home Assistant.
 - Files in `/www` are available under `/local` in the frontend.
 - Supported extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.bmp`.
+
+## Troubleshooting: "Keine Bilder gefunden"
+
+1. Verify the card uses `folder: /local/snapshots`.
+2. Open `/local/snapshots/` in the browser. If directory listing is blocked (typical), create `/config/www/snapshots/index.json`.
+3. Example `index.json`:
+
+```json
+{
+  "images": ["bild1.jpg", "bild2.jpg", "bild3.jpg"]
+}
+```
+
+4. Alternative: set images directly in Lovelace via `images:`.
 
 ## Release Checklist
 

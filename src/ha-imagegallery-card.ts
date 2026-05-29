@@ -294,7 +294,7 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     if (!this._images.length) {
-      return html`<div class="center">Keine Bilder gefunden</div>`;
+      return html`<div class="center">Keine Bilder gefunden. In Home Assistant ist Verzeichnis-Listing oft deaktiviert. Nutze /local/snapshots und lege eine index.json an oder setze images: [] direkt in der Karten-Konfiguration.</div>`;
     }
 
     return html`<img src=${this._images[this._index]} alt="Gallery image" loading="lazy" />`;
@@ -430,9 +430,30 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   private _normalizeFolder(folder: string): string {
-    const cleaned = folder.trim();
-    const withPrefix = cleaned.startsWith("/") ? cleaned : `/${cleaned}`;
+    const cleaned = folder.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+    const asLocal = cleaned
+      .replace(/^config\/www\//, "local/")
+      .replace(/^www\//, "local/")
+      .replace(/^local\//, "local/");
+
+    const withPrefix = `/${asLocal}`;
     return withPrefix.endsWith("/") ? withPrefix.slice(0, -1) : withPrefix;
+  }
+
+  private _normalizeImageUrl(url: string): string {
+    const cleaned = url.trim().replace(/\\/g, "/");
+    const withoutLeadingSlash = cleaned.replace(/^\/+/, "");
+
+    let mapped = cleaned;
+    if (/^config\/www\//.test(withoutLeadingSlash)) {
+      mapped = `/${withoutLeadingSlash.replace(/^config\/www\//, "local/")}`;
+    } else if (/^www\//.test(withoutLeadingSlash)) {
+      mapped = `/${withoutLeadingSlash.replace(/^www\//, "local/")}`;
+    } else if (/^local\//.test(withoutLeadingSlash)) {
+      mapped = `/${withoutLeadingSlash}`;
+    }
+
+    return mapped.replace(/\s/g, "%20");
   }
 
   private _resolveFolderEntry(folder: string, entry: string): string {
@@ -442,10 +463,6 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     return this._normalizeImageUrl(`${folder}/${cleaned.replace(/^\.\//, "")}`);
-  }
-
-  private _normalizeImageUrl(url: string): string {
-    return url.replace(/\\/g, "/").replace(/\s/g, "%20");
   }
 
   private _showPrevious = (): void => {
