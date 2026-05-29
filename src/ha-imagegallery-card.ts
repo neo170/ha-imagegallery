@@ -113,6 +113,9 @@ export class HaImageGalleryCard extends LitElement {
   private _lastTouchTapY = 0;
   private _lastCardSlideChangeAt = 0;
   private _syncingSwiperIndex = false;
+  private _gestureStartX = 0;
+  private _gestureStartY = 0;
+  private _gestureBlocking = false;
 
   static styles = css`
     :host {
@@ -446,6 +449,10 @@ export class HaImageGalleryCard extends LitElement {
 
         <div
           class="viewport"
+          @touchstart=${this._onGestureTouchStart}
+          @touchmove=${this._onGestureTouchMove}
+          @touchend=${this._onGestureTouchEnd}
+          @touchcancel=${this._onGestureTouchEnd}
           @click=${this._onViewportClick}
           role="button"
           tabindex="0"
@@ -486,14 +493,19 @@ export class HaImageGalleryCard extends LitElement {
         slides-per-view="1"
         speed="260"
         rewind="true"
-        resistance-ratio="0.75"
-        threshold="6"
+        resistance-ratio="0.15"
+        threshold="3"
+        long-swipes-ratio="0.18"
+        long-swipes-ms="180"
+        preload-images="true"
+        watch-slides-progress="true"
+        update-on-images-ready="true"
         @swiperslidechange=${this._onCardSlideChange}
       >
         ${this._images.map(
           (src) => html`
             <swiper-slide class="card-slide">
-              <img src=${src} alt="Gallery image" loading="lazy" draggable="false" />
+              <img src=${src} alt="Gallery image" loading="eager" draggable="false" />
             </swiper-slide>
           `
         )}
@@ -505,7 +517,14 @@ export class HaImageGalleryCard extends LitElement {
     const currentImage = this._images[this._index];
 
     return html`
-      <div class="overlay" @wheel=${this._onDialogWheelZoom}>
+      <div
+        class="overlay"
+        @wheel=${this._onDialogWheelZoom}
+        @touchstart=${this._onGestureTouchStart}
+        @touchmove=${this._onGestureTouchMove}
+        @touchend=${this._onGestureTouchEnd}
+        @touchcancel=${this._onGestureTouchEnd}
+      >
         <div class="overlay-top">
           <button class="close" @click=${this._closeDialog} @touchend=${this._closeDialogFromTouch} aria-label="Schliessen">✕</button>
           <div>${this._getFileName(currentImage)}</div>
@@ -518,8 +537,13 @@ export class HaImageGalleryCard extends LitElement {
             speed="260"
             rewind="true"
             zoom="true"
-            resistance-ratio="0.75"
-            threshold="6"
+            resistance-ratio="0.15"
+            threshold="3"
+            long-swipes-ratio="0.18"
+            long-swipes-ms="180"
+            preload-images="true"
+            watch-slides-progress="true"
+            update-on-images-ready="true"
             touch-start-prevent-default="true"
             touch-move-stop-propagation="true"
             touch-release-on-edges="false"
@@ -531,7 +555,7 @@ export class HaImageGalleryCard extends LitElement {
               (src) => html`
                 <swiper-slide class="dialog-slide">
                   <div class="swiper-zoom-container">
-                    <img src=${src} alt="Fullscreen image" draggable="false" />
+                    <img src=${src} alt="Fullscreen image" loading="eager" draggable="false" />
                   </div>
                 </swiper-slide>
               `
@@ -975,6 +999,51 @@ export class HaImageGalleryCard extends LitElement {
     if (ev.key === "ArrowRight") {
       this._showNext();
     }
+  };
+
+  private _onGestureTouchStart = (ev: TouchEvent): void => {
+    if (ev.touches.length !== 1) {
+      this._gestureBlocking = false;
+      return;
+    }
+
+    const touch = ev.touches[0];
+    if (!touch) {
+      this._gestureBlocking = false;
+      return;
+    }
+
+    this._gestureStartX = touch.clientX;
+    this._gestureStartY = touch.clientY;
+    this._gestureBlocking = false;
+  };
+
+  private _onGestureTouchMove = (ev: TouchEvent): void => {
+    if (ev.touches.length !== 1) {
+      this._gestureBlocking = false;
+      return;
+    }
+
+    const touch = ev.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    const dx = touch.clientX - this._gestureStartX;
+    const dy = touch.clientY - this._gestureStartY;
+
+    if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) {
+      this._gestureBlocking = true;
+    }
+
+    if (this._gestureBlocking) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+  };
+
+  private _onGestureTouchEnd = (): void => {
+    this._gestureBlocking = false;
   };
 
   private _onCardSwipeStart = (ev: TouchEvent): void => {
