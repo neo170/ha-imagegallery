@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 interface HomeAssistant {
   locale: { language: string };
-  callApi?: (method: string, path: string) => Promise<unknown>;
+  states?: Record<string, { attributes?: Record<string, unknown> }>;
 }
 
 interface ImageGalleryCardConfig {
@@ -11,6 +11,7 @@ interface ImageGalleryCardConfig {
   title?: string;
   folder?: string;
   images?: string[];
+  entity?: string;
   refresh_interval?: number;
   sort?: "newest_first" | "oldest_first" | "none";
 }
@@ -18,11 +19,6 @@ interface ImageGalleryCardConfig {
 interface DiscoveryResult {
   images: string[];
   reason?: string;
-}
-
-interface BackendFetchResult {
-  images: string[];
-  success: boolean;
 }
 
 type PointerMap = Map<number, { x: number; y: number }>;
@@ -262,6 +258,12 @@ export class HaImageGalleryCard extends LitElement {
     }
   }
 
+  protected updated(changedProps: PropertyValues): void {
+    if (changedProps.has("hass") && this._config?.entity) {
+      this._loadImagesFromEntity();
+    }
+  }
+
   protected render(): TemplateResult {
     if (!this._config) {
       return html`<ha-card><div class="center">Ungultige Kartenkonfiguration</div></ha-card>`;
@@ -354,29 +356,21 @@ export class HaImageGalleryCard extends LitElement {
     this._error = "";
 
     try {
+      if (this._config.entity) {
+        this._loadImagesFromEntity();
+        return;
+      }
+
       const configured = (this._config.images ?? []).filter((entry) => entry && entry.trim().length > 0);
 
       let images: string[] = [];
       if (configured.length > 0) {
         images = configured.map((entry) => this._normalizeImageUrl(entry));
       } else {
-        const folder = this._config.folder ?? "/local/snapshots";
-
-        const fromIntegration = await this._fetchImagesFromIntegration(folder);
-        if (fromIntegration.success) {
-          images = fromIntegration.images;
-          if (!images.length) {
-            this._error = "Keine Bilder im ueberwachten Snapshot-Ordner gefunden.";
-          }
-        } else {
-          const result = await this._discoverImagesFromFolder(folder);
-          images = result.images;
-          if (!images.length && result.reason) {
-            this._error =
-              "Backend-Integration nicht aktiv (API /api/ha_imagegallery/images nicht erreichbar). " +
-              "Installiere zusaetzlich die Integration und starte Home Assistant neu. " +
-              result.reason;
-          }
+        const result = await this._discoverImagesFromFolder(this._config.folder ?? "/local/snapshots");
+        images = result.images;
+        if (!images.length && result.reason) {
+          this._error = result.reason;
         }
       }
 
@@ -409,33 +403,59 @@ export class HaImageGalleryCard extends LitElement {
     }
   }
 
-  private async _fetchImagesFromIntegration(folder: string): Promise<BackendFetchResult> {
-    const normalizedFolder = this._normalizeFolder(folder);
-    const path = `ha_imagegallery/images?folder=${encodeURIComponent(normalizedFolder)}`;
-
-    try {
-      const payload = this.hass?.callApi
-        ? ((await this.hass.callApi("GET", path)) as unknown)
-        : ((await (await fetch(`/api/${path}`, { cache: "no-store" })).json()) as unknown);
-
-      if (!payload || typeof payload !== "object") {
-        return { images: [], success: false };
-      }
-
-      const images = (payload as { images?: unknown }).images;
-      if (!Array.isArray(images)) {
-        return { images: [], success: true };
-      }
-
-      const mapped = images
-        .filter((entry): entry is string => typeof entry === "string")
-        .map((entry) => this._normalizeImageUrl(entry))
-        .filter((entry) => this._isImagePath(entry));
-
-      return { images: mapped, success: true };
-    } catch {
-      return { images: [], success: false };
+  private _loadImagesFromEntity(): void {
+    const entityId = this._config?.entity?.trim();
+    if (!entityId) {
+      return;
     }
+
+    const state = this.hass?.states?.[entityId];
+    if (!state) {
+      this._images = [];
+      this._index = 0;
+      this._error = `Entity nicht gefunden: ${entityId}`;
+      this._loading = false;
+      return;
+    }
+
+    const attrs = state.attributes ?? {};
+    const imagesAttr = attrs.images;
+    if (!Array.isArray(imagesAttr)) {
+      this._images = [];
+      this._index = 0;
+      this._error = `Entity ${entityId} liefert kein Attribut images`;
+      this._loading = false;
+      return;
+    }
+
+    const normalized = imagesAttr
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => this._normalizeImageUrl(entry))
+      .filter((entry) => this._isImagePath(entry));
+
+    const sortedImages = this._sortImages(normalized);
+    const previousImages = this._images;
+    const previousCurrent = previousImages[this._index];
+    const previousFirst = previousImages[0];
+
+    this._images = sortedImages;
+    this._error = this._images.length ? "" : `Entity ${entityId} liefert keine Bilder`;
+
+    if (!this._images.length) {
+      this._index = 0;
+    } else {
+      const newestChanged = previousFirst !== this._images[0];
+      if (newestChanged) {
+        this._index = 0;
+      } else if (previousCurrent) {
+        const sameImageIndex = this._images.indexOf(previousCurrent);
+        this._index = sameImageIndex >= 0 ? sameImageIndex : 0;
+      } else if (this._index >= this._images.length) {
+        this._index = Math.max(0, this._images.length - 1);
+      }
+    }
+
+    this._loading = false;
   }
 
   private async _discoverImagesFromFolder(folder: string): Promise<DiscoveryResult> {
@@ -804,6 +824,10 @@ export class HaImageGalleryCard extends LitElement {
 
   private _restartRefreshTimer(): void {
     this._clearRefreshTimer();
+
+    if (this._config?.entity) {
+      return;
+    }
 
     const intervalSeconds = this._config?.refresh_interval ?? 15;
     if (!intervalSeconds || intervalSeconds < 5) {

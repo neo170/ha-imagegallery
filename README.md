@@ -1,101 +1,44 @@
 # HA Image Gallery Card
 
-Custom Lovelace card for Home Assistant with backend folder monitoring. The integration watches `/config/www/snapshots`, builds an internal image list, and the card reads that list via API.
+Custom Lovelace dashboard card for Home Assistant.
+
+This repository contains only the frontend card (HACS type: Dashboard).
+Folder watching and in-memory image indexing are provided by the separate integration repository `ha-lastsnapshot`.
 
 ## Features
 
-- Shows images from a folder in Home Assistant
-- Swipe left/right to navigate
-- Tap/click image to open fullscreen viewer
-- Pinch-to-zoom on touch devices
-- Mouse wheel zoom on desktop
-- Drag to pan while zoomed
-- Backend folder watcher (watchdog) for new files
-- Internal image index sorted by file mtime (newest first)
+- Swipe left/right image navigation
+- Tap/click to open fullscreen viewer
+- Pinch-to-zoom and pan in fullscreen
+- Works with image list from `camera.lastsnapshot` attribute `images`
 
 ## Installation (HACS)
 
-1. Push this repository to GitHub.
-2. In HACS, add the repository as a Custom Repository:
-   - Type: Dashboard
-   - Repository: `your-user/ha-imagegallery`
-3. Install **HA Image Gallery** through HACS.
-4. Restart Home Assistant.
-5. Add the card in Lovelace.
+1. Add this repository in HACS as Custom Repository with type `Dashboard`.
+2. Install `HA Image Gallery`.
+3. Ensure resource is loaded (if needed): `/hacsfiles/ha-imagegallery/ha-imagegallery-card.js`.
 
-Important: HACS Dashboard installation only installs the Lovelace card JS.
-For folder watching and in-memory index, you must also install the backend integration files under `custom_components/ha_imagegallery`.
+## Required Backend
 
-Recommended setup:
+Install the separate integration repository `ha-lastsnapshot` (HACS type: Integration).
+It exposes image URLs in `camera.lastsnapshot` attributes:
 
-1. Install dashboard card via HACS (for Lovelace resource).
-2. Copy `custom_components/ha_imagegallery` from this repo to your HA config directory.
-3. Restart Home Assistant.
+- `images`
+- `latest_image`
+- `count`
 
-## Backend Integration Setup (required for folder watch)
+## Lovelace Config
 
-Copy folder `custom_components/ha_imagegallery` into your Home Assistant config directory and add this to `configuration.yaml`:
-
-```yaml
-ha_imagegallery:
-  snapshot_dir: www/snapshots
-  url_prefix: /local/snapshots
-```
-
-Then restart Home Assistant.
-
-The integration exposes API endpoint:
-
-```text
-/api/ha_imagegallery/images
-```
-
-The card reads this endpoint first. If backend integration is not installed, it falls back to index.json/directory listing.
-
-No `index.json` file is required when backend integration is active.
-The image index is kept in memory and updated by filesystem events.
-
-Resource URL after HACS install (if not auto-added):
-
-```text
-/hacsfiles/ha-imagegallery/ha-imagegallery-card.js
-```
-
-## Build
-
-```bash
-npm install
-npm run build
-```
-
-For development:
-
-```bash
-npm run watch
-```
-
-## Lovelace Configuration
-
-### Basic
+### Recommended (with backend integration)
 
 ```yaml
 type: custom:ha-imagegallery-card
-folder: /local/snapshots
-```
-
-Important: use frontend path `/local/...` in card config, not `/config/www/...`.
-
-### With options
-
-```yaml
-type: custom:ha-imagegallery-card
+entity: camera.lastsnapshot
 title: Kamera Snapshots
-folder: /local/snapshots
-refresh_interval: 60
 sort: newest_first
 ```
 
-### Explicit image list (optional)
+### Static image list (without backend)
 
 ```yaml
 type: custom:ha-imagegallery-card
@@ -104,64 +47,21 @@ images:
   - /local/snapshots/garage.jpg
 ```
 
-## How image discovery works
+### Folder fallback (legacy)
 
-The card tries the following, in order:
-
-1. Uses `images` from card config when provided.
-2. Tries `index.json` in the folder (for example `/local/snapshots/index.json`).
-3. Tries to parse a directory listing when the server exposes one.
-
-Recommended for reliability: create `/www/snapshots/index.json` with either:
-
-```json
-["img1.jpg", "img2.jpg"]
+```yaml
+type: custom:ha-imagegallery-card
+folder: /local/snapshots
+refresh_interval: 60
 ```
 
-or
+## Options
 
-```json
-{ "images": ["img1.jpg", "img2.jpg"] }
-```
-
-## Notes
-
-- Place images under `config/www/snapshots` in Home Assistant.
-- Files in `/www` are available under `/local` in the frontend.
-- Supported extensions: `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.bmp`.
-- Default behavior: backend integration updates internal list on filesystem events; card refreshes view and jumps to the newest image when list changes.
-
-## Sorting
-
-- `sort: newest_first` (default) shows newest image first.
-- `sort: oldest_first` shows chronological order from oldest to newest.
-- `sort: none` keeps source order.
-
-Timestamp detection for sorting uses common filename patterns, for example:
-
-- `snapshot_2026-05-29_16-45-30.jpg`
-- `cam_20260529_164530.jpg`
-- `image_1748537130.jpg` (unix timestamp)
-
-## Troubleshooting: "Keine Bilder gefunden"
-
-1. Verify the card uses `folder: /local/snapshots`.
-2. Open `/local/snapshots/` in the browser. If directory listing is blocked (typical), create `/config/www/snapshots/index.json`.
-3. Example `index.json`:
-
-```json
-{
-  "images": ["bild1.jpg", "bild2.jpg", "bild3.jpg"]
-}
-```
-
-4. Alternative: set images directly in Lovelace via `images:`.
-
-## Release Checklist
-
-1. Run `npm install` and `npm run ci`.
-2. Commit source and generated file `dist/ha-imagegallery-card.js`.
-3. Create a GitHub tag like `v0.1.0` and publish a release.
+- `entity`: camera entity that provides attribute `images` (string list)
+- `images`: explicit image URL list
+- `folder`: fallback folder source
+- `refresh_interval`: refresh interval for folder fallback
+- `sort`: `newest_first` (default), `oldest_first`, `none`
 
 ## License
 
