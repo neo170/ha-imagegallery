@@ -29,6 +29,9 @@ It exposes image URLs in `camera.lastsnapshot` attributes:
 
 ## Lovelace Config
 
+You can configure the card directly in the Lovelace UI editor (visual editor).
+Set the Last Snapshot camera entity there, usually `camera.lastsnapshot`.
+
 ### Recommended (with backend integration)
 
 ```yaml

@@ -16,6 +16,10 @@ interface ImageGalleryCardConfig {
   sort?: "newest_first" | "oldest_first" | "none";
 }
 
+interface ConfigChangedEvent extends Event {
+  detail: { config: ImageGalleryCardConfig };
+}
+
 interface DiscoveryResult {
   images: string[];
   reason?: string;
@@ -217,6 +221,19 @@ export class HaImageGalleryCard extends LitElement {
       }
     }
   `;
+
+  public static getStubConfig(): ImageGalleryCardConfig {
+    return {
+      type: "custom:ha-imagegallery-card",
+      entity: "camera.lastsnapshot",
+      title: "Kamera Snapshots",
+      sort: "newest_first"
+    };
+  }
+
+  public static async getConfigElement(): Promise<HTMLElement> {
+    return document.createElement("ha-imagegallery-card-editor");
+  }
 
   public setConfig(config: ImageGalleryCardConfig): void {
     if (!config) {
@@ -851,9 +868,128 @@ export class HaImageGalleryCard extends LitElement {
   }
 }
 
+@customElement("ha-imagegallery-card-editor")
+class HaImageGalleryCardEditor extends LitElement {
+  @property({ attribute: false })
+  public hass?: HomeAssistant;
+
+  @state()
+  private _config: ImageGalleryCardConfig = {
+    type: "custom:ha-imagegallery-card",
+    entity: "camera.lastsnapshot",
+    sort: "newest_first"
+  };
+
+  static styles = css`
+    .editor {
+      display: grid;
+      gap: 12px;
+      padding: 4px 0;
+    }
+
+    .hint {
+      font-size: 0.85rem;
+      opacity: 0.8;
+      line-height: 1.4;
+    }
+
+    label {
+      font-size: 0.8rem;
+      opacity: 0.85;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    input,
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(120, 120, 120, 0.45);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+    }
+  `;
+
+  public setConfig(config: ImageGalleryCardConfig): void {
+    this._config = {
+      sort: "newest_first",
+      ...config,
+      type: "custom:ha-imagegallery-card"
+    };
+  }
+
+  protected render(): TemplateResult {
+    return html`
+      <div class="editor">
+        <div>
+          <label>LastSnapshot Kamera Entity</label>
+          <input
+            .value=${this._config.entity ?? "camera.lastsnapshot"}
+            @input=${(ev: InputEvent) => this._onInput("entity", (ev.target as HTMLInputElement).value)}
+            placeholder="camera.lastsnapshot"
+          />
+        </div>
+
+        <div>
+          <label>Titel</label>
+          <input
+            .value=${this._config.title ?? ""}
+            @input=${(ev: InputEvent) => this._onInput("title", (ev.target as HTMLInputElement).value)}
+            placeholder="Kamera Snapshots"
+          />
+        </div>
+
+        <div>
+          <label>Sortierung</label>
+          <select
+            .value=${this._config.sort ?? "newest_first"}
+            @change=${(ev: Event) => this._onInput("sort", (ev.target as HTMLSelectElement).value)}
+          >
+            <option value="newest_first">Neueste zuerst</option>
+            <option value="oldest_first">Aelteste zuerst</option>
+            <option value="none">Keine Sortierung</option>
+          </select>
+        </div>
+
+        <div class="hint">Empfohlen: Entity camera.lastsnapshot aus der ha-lastsnapshot Integration verwenden.</div>
+      </div>
+    `;
+  }
+
+  private _onInput(key: keyof ImageGalleryCardConfig, rawValue: string): void {
+    const value = rawValue.trim();
+    const updated: ImageGalleryCardConfig = {
+      ...this._config,
+      type: "custom:ha-imagegallery-card"
+    };
+
+    if (!value && key !== "sort") {
+      delete updated[key];
+    } else {
+      updated[key] = value as never;
+    }
+
+    this._config = updated;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true
+      })
+    );
+  }
+}
+
 declare global {
   interface Window {
     customCards?: Array<Record<string, unknown>>;
+  }
+
+  interface HTMLElementTagNameMap {
+    "ha-imagegallery-card-editor": HaImageGalleryCardEditor;
   }
 }
 
