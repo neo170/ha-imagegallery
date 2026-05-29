@@ -601,7 +601,7 @@ export class HaImageGalleryCard extends LitElement {
                 <swiper-slide class="dialog-slide">
                   <img src=${src} alt="Fullscreen image" loading="eager" draggable="false"
                     style=${src === currentImage
-                      ? `transform: translate3d(${this._offsetX}px, ${this._offsetY}px, 0) scale(${this._scale})`
+                      ? `transform: translate(${this._offsetX}px, ${this._offsetY}px) scale(${this._scale})`
                       : ''}
                   />
                 </swiper-slide>
@@ -1470,7 +1470,7 @@ export class HaImageGalleryCard extends LitElement {
     // Proportional zoom: smooth on trackpad and mouse wheel (~26% per notch)
     const pixels = ev.deltaMode === 1 ? ev.deltaY * 30 : ev.deltaY;
     const factor = Math.exp(-pixels * 0.003);
-    const newScale = this._clamp(this._scale * factor, 1, 4);
+    const newScale = this._clamp(this._scale * factor, 1, 6);
     if (newScale <= 1.02) {
       this._resetZoom();
       return;
@@ -1554,14 +1554,6 @@ export class HaImageGalleryCard extends LitElement {
       const t = ev.touches[0]!;
       this._offsetX = this._dragStartOffsetX + (t.clientX - this._dragStartPointerX);
       this._offsetY = this._dragStartOffsetY + (t.clientY - this._dragStartPointerY);
-      // Clamp so the image can't be dragged fully off-screen (prevents iOS black-tile bug)
-      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
-      const stageW = stage?.clientWidth ?? window.innerWidth;
-      const stageH = stage?.clientHeight ?? window.innerHeight;
-      const maxX = (this._scale - 1) * stageW / 2;
-      const maxY = (this._scale - 1) * stageH / 2;
-      this._offsetX = this._clamp(this._offsetX, -maxX, maxX);
-      this._offsetY = this._clamp(this._offsetY, -maxY, maxY);
       this.requestUpdate();
     }
   };
@@ -1580,7 +1572,7 @@ export class HaImageGalleryCard extends LitElement {
       this._isPinching = false;
     }
 
-    const ZOOM_MIN = 1, ZOOM_MAX = 4;
+    const ZOOM_MIN = 1, ZOOM_MAX = 6;
 
     if (this._scale < ZOOM_MIN || this._scale > ZOOM_MAX) {
       // Rubber-band snap-back: animate to the clamped limit
@@ -1686,7 +1678,7 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   private _rubberBandScale(raw: number): number {
-    const min = 1, max = 4;
+    const min = 1, max = 6;
     if (raw < min) return min - (min - raw) * 0.35;
     if (raw > max) return max + (raw - max) * 0.35;
     return raw;
