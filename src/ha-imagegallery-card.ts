@@ -85,8 +85,8 @@ export class HaImageGalleryCard extends LitElement {
     ha-card {
       overflow: hidden;
       border-radius: 16px;
-      background: linear-gradient(160deg, #10253d, #0e1f2f 45%, #123a3a);
-      color: #f3f7fb;
+      background: white;
+      color: #333333;
       position: relative;
     }
 
@@ -123,7 +123,7 @@ export class HaImageGalleryCard extends LitElement {
       justify-content: space-between;
       padding: 10px 12px 12px;
       font-size: 0.88rem;
-      color: #d5e3f0;
+      color: #333333;
       gap: 8px;
     }
 
@@ -133,8 +133,8 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     button {
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(100, 100, 100, 0.3);
+      background: rgba(100, 100, 100, 0.1);
       color: inherit;
       border-radius: 999px;
       width: 34px;
@@ -837,7 +837,23 @@ export class HaImageGalleryCard extends LitElement {
   private _getFileName(pathValue: string): string {
     const source = pathValue.split("?")[0] ?? pathValue;
     const chunks = source.split("/");
-    return decodeURIComponent(chunks[chunks.length - 1] ?? pathValue);
+    const fileName = decodeURIComponent(chunks[chunks.length - 1] ?? pathValue);
+    return this._extractDateTimeFromFileName(fileName);
+  }
+
+  private _extractDateTimeFromFileName(fileName: string): string {
+    const match = fileName.match(/^(.+?)_(\d{8})_(\d{6})\./);
+    if (match) {
+      const dateStr = match[2];
+      const timeStr = match[3];
+      const year = dateStr.substring(0, 4);
+      const month = dateStr.substring(4, 6);
+      const day = dateStr.substring(6, 8);
+      const hour = timeStr.substring(0, 2);
+      const min = timeStr.substring(2, 4);
+      return `${day}.${month}.${year} ${hour}:${min}`;
+    }
+    return fileName;
   }
 
   private _restartRefreshTimer(): void {
