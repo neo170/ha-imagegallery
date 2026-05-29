@@ -115,6 +115,7 @@ export class HaImageGalleryCard extends LitElement {
   private _lastTouchTapTime = 0;
   private _lastTouchTapX = 0;
   private _lastTouchTapY = 0;
+  private _isPinching = false;
   private _lastCardSlideChangeAt = 0;
   private _syncingSwiperIndex = false;
   private _globalTouchStartX = 0;
@@ -1472,6 +1473,7 @@ export class HaImageGalleryCard extends LitElement {
       const t2 = ev.touches[1]!;
       this._pinchStartDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       this._pinchStartScale = this._scale;
+      this._isPinching = true;
       // Lock scroll immediately so Swiper doesn't start scrolling
       const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
       stage?.classList.add("zoom-locked");
@@ -1501,7 +1503,7 @@ export class HaImageGalleryCard extends LitElement {
       const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
       stage?.classList.toggle("zoom-locked", this._scale > 0.98);
       this.requestUpdate();
-    } else if (ev.touches.length === 1 && this._scale > 1) {
+    } else if (ev.touches.length === 1 && this._scale > 1 && !this._isPinching) {
       ev.preventDefault();
       ev.stopPropagation();
       const t = ev.touches[0]!;
@@ -1518,6 +1520,11 @@ export class HaImageGalleryCard extends LitElement {
     if (this._zoomAnimationTimer) {
       window.clearTimeout(this._zoomAnimationTimer);
       this._zoomAnimationTimer = undefined;
+    }
+
+    // All fingers lifted → pinch is over; re-arm single-finger pan
+    if (ev.touches.length === 0) {
+      this._isPinching = false;
     }
 
     const ZOOM_MIN = 1, ZOOM_MAX = 4;
@@ -1630,6 +1637,7 @@ export class HaImageGalleryCard extends LitElement {
       this._zoomAnimationTimer = undefined;
     }
     this._dialogZoomAnimate = false;
+    this._isPinching = false;
     this._scale = 1;
     this._offsetX = 0;
     this._offsetY = 0;
