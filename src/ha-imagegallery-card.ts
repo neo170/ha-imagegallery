@@ -113,6 +113,11 @@ export class HaImageGalleryCard extends LitElement {
   private _lastTouchTapY = 0;
   private _lastCardSlideChangeAt = 0;
   private _syncingSwiperIndex = false;
+  private _fsTouchStartX = 0;
+  private _fsTouchStartY = 0;
+  private _fsTouchLastX = 0;
+  private _fsSwipeCandidate = false;
+  private _fsSwipeHorizontal = false;
 
   private _isIOSLikeDevice(): boolean {
     if (typeof navigator === "undefined") {
@@ -533,7 +538,13 @@ export class HaImageGalleryCard extends LitElement {
           <div>${this._getFileName(currentImage)}</div>
         </div>
 
-        <div class="overlay-stage">
+        <div
+          class="overlay-stage"
+          @touchstart=${this._onFullscreenTouchStart}
+          @touchmove=${this._onFullscreenTouchMove}
+          @touchend=${this._onFullscreenTouchEnd}
+          @touchcancel=${this._onFullscreenTouchEnd}
+        >
           <swiper-container
             class="dialog-swiper"
             slides-per-view="1"
@@ -1408,6 +1419,85 @@ export class HaImageGalleryCard extends LitElement {
     } else {
       dialogSwiper.zoom.out();
     }
+  };
+
+  private _onFullscreenTouchStart = (ev: TouchEvent): void => {
+    if (!this._isIOSLikeDevice()) {
+      return;
+    }
+
+    if (ev.touches.length !== 1) {
+      this._fsSwipeCandidate = false;
+      this._fsSwipeHorizontal = false;
+      return;
+    }
+
+    const dialogSwiper = this._getDialogSwiper();
+    if ((dialogSwiper?.zoom?.scale ?? 1) > 1.01) {
+      this._fsSwipeCandidate = false;
+      this._fsSwipeHorizontal = false;
+      return;
+    }
+
+    const touch = ev.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    this._fsTouchStartX = touch.clientX;
+    this._fsTouchStartY = touch.clientY;
+    this._fsTouchLastX = touch.clientX;
+    this._fsSwipeCandidate = true;
+    this._fsSwipeHorizontal = false;
+  };
+
+  private _onFullscreenTouchMove = (ev: TouchEvent): void => {
+    if (!this._isIOSLikeDevice() || !this._fsSwipeCandidate || ev.touches.length !== 1) {
+      return;
+    }
+
+    const touch = ev.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    this._fsTouchLastX = touch.clientX;
+    const dx = touch.clientX - this._fsTouchStartX;
+    const dy = touch.clientY - this._fsTouchStartY;
+
+    if (!this._fsSwipeHorizontal && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+      this._fsSwipeHorizontal = true;
+    }
+
+    if (this._fsSwipeHorizontal) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+  };
+
+  private _onFullscreenTouchEnd = (ev: TouchEvent): void => {
+    if (!this._isIOSLikeDevice() || !this._fsSwipeCandidate) {
+      this._fsSwipeCandidate = false;
+      this._fsSwipeHorizontal = false;
+      return;
+    }
+
+    const changed = ev.changedTouches[0];
+    const endX = changed ? changed.clientX : this._fsTouchLastX;
+    const dx = endX - this._fsTouchStartX;
+
+    if (this._fsSwipeHorizontal && Math.abs(dx) > 34) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (dx < 0) {
+        this._showNext();
+      } else {
+        this._showPrevious();
+      }
+    }
+
+    this._fsSwipeCandidate = false;
+    this._fsSwipeHorizontal = false;
   };
 
   private _distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
