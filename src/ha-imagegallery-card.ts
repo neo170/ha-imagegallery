@@ -76,6 +76,8 @@ export class HaImageGalleryCard extends LitElement {
   private _dragStartPointerY = 0;
   private _dragStartOffsetX = 0;
   private _dragStartOffsetY = 0;
+  private _isAnimating = false;
+  private _swipeDirection: 'left' | 'right' | null = null;
 
   static styles = css`
     :host {
@@ -112,6 +114,66 @@ export class HaImageGalleryCard extends LitElement {
       object-fit: contain;
       display: block;
       background: rgba(0, 0, 0, 0.14);
+    }
+
+    @keyframes slideOutLeft {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes slideOutRight {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+    }
+
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .viewport img.slide-out-left {
+      animation: slideOutLeft 0.4s ease-out forwards;
+    }
+
+    .viewport img.slide-in-right {
+      animation: slideInRight 0.4s ease-out;
+    }
+
+    .viewport img.slide-out-right {
+      animation: slideOutRight 0.4s ease-out forwards;
+    }
+
+    .viewport img.slide-in-left {
+      animation: slideInLeft 0.4s ease-out;
     }
 
     .caption {
@@ -199,7 +261,7 @@ export class HaImageGalleryCard extends LitElement {
       transition: transform 0.3s ease-out;
       will-change: transform;
       user-select: none;
-      pointer-events: none;
+      pointer-events: auto;
     }
 
     .overlay-stage img.no-transition {
@@ -217,16 +279,16 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     .close {
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
+      width: auto;
+      height: auto;
+      display: inline;
+      border: none;
+      background: none;
       padding: 0;
-      font-size: 1.2rem;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.08);
+      font-size: 2rem;
+      color: white;
+      cursor: pointer;
+      line-height: 1;
     }
 
     @media (max-width: 650px) {
@@ -349,7 +411,14 @@ export class HaImageGalleryCard extends LitElement {
       return html`<div class="center">Keine Bilder gefunden</div>`;
     }
 
-    return html`<img src=${this._images[this._index]} alt="Gallery image" loading="lazy" />`;
+    let className = '';
+    if (this._isAnimating && this._swipeDirection === 'left') {
+      className = 'slide-out-left';
+    } else if (this._isAnimating && this._swipeDirection === 'right') {
+      className = 'slide-out-right';
+    }
+
+    return html`<img src=${this._images[this._index]} alt="Gallery image" loading="lazy" class=${className} />`;
   }
 
   private _renderDialog(): TemplateResult {
@@ -676,6 +745,20 @@ export class HaImageGalleryCard extends LitElement {
     this._dialogOpen = true;
   };
 
+  private _animateSwipe = (direction: 'left' | 'right'): void => {
+    this.requestUpdate();
+    setTimeout(() => {
+      if (direction === 'left') {
+        this._showNext();
+      } else {
+        this._showPrevious();
+      }
+      this._isAnimating = false;
+      this._swipeDirection = null;
+      this.requestUpdate();
+    }, 400);
+  };
+
   private _stopEvent = (event: Event): void => {
     event.stopPropagation();
   };
@@ -721,7 +804,7 @@ export class HaImageGalleryCard extends LitElement {
 
   private _onSwipeEnd = (ev: TouchEvent): void => {
     const touch = ev.changedTouches[0];
-    if (!touch) {
+    if (!touch || this._isAnimating) {
       return;
     }
 
@@ -730,10 +813,13 @@ export class HaImageGalleryCard extends LitElement {
     const dt = Date.now() - this._touchStartTime;
 
     if (Math.abs(dx) > 45 && Math.abs(dy) < 60 && dt < 600) {
+      this._isAnimating = true;
       if (dx < 0) {
-        this._showNext();
+        this._swipeDirection = 'left';
+        this._animateSwipe('left');
       } else {
-        this._showPrevious();
+        this._swipeDirection = 'right';
+        this._animateSwipe('right');
       }
     }
   };
