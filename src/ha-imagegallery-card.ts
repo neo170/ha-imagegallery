@@ -428,7 +428,7 @@ export class HaImageGalleryCard extends LitElement {
       this._loadImagesFromEntity();
     }
 
-    if (changedProps.has("_dialogOpen") || changedProps.has("_index") || changedProps.has("_images")) {
+    if (changedProps.has("_dialogOpen") || changedProps.has("_images")) {
       this._syncSwipersToIndex();
     }
   }
