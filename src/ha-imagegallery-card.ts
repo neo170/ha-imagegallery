@@ -1470,7 +1470,7 @@ export class HaImageGalleryCard extends LitElement {
     // Proportional zoom: smooth on trackpad and mouse wheel (~26% per notch)
     const pixels = ev.deltaMode === 1 ? ev.deltaY * 30 : ev.deltaY;
     const factor = Math.exp(-pixels * 0.003);
-    const newScale = this._clamp(this._scale * factor, 1, 6);
+    const newScale = this._clamp(this._scale * factor, 1, 4);
     if (newScale <= 1.02) {
       this._resetZoom();
       return;
@@ -1580,7 +1580,7 @@ export class HaImageGalleryCard extends LitElement {
       this._isPinching = false;
     }
 
-    const ZOOM_MIN = 1, ZOOM_MAX = 6;
+    const ZOOM_MIN = 1, ZOOM_MAX = 4;
 
     if (this._scale < ZOOM_MIN || this._scale > ZOOM_MAX) {
       // Rubber-band snap-back: animate to the clamped limit
@@ -1686,7 +1686,7 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   private _rubberBandScale(raw: number): number {
-    const min = 1, max = 6;
+    const min = 1, max = 4;
     if (raw < min) return min - (min - raw) * 0.35;
     if (raw > max) return max + (raw - max) * 0.35;
     return raw;
