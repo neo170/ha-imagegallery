@@ -244,6 +244,7 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     this._config = {
+      entity: "camera.latest_snapshot",
       folder: "/local/snapshots",
       refresh_interval: 15,
       sort: "newest_first",
@@ -276,7 +277,7 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   protected updated(changedProps: PropertyValues): void {
-    if (changedProps.has("hass") && this._config?.entity) {
+    if (changedProps.has("hass") && this._getEntityId()) {
       this._loadImagesFromEntity();
     }
   }
@@ -373,7 +374,7 @@ export class HaImageGalleryCard extends LitElement {
     this._error = "";
 
     try {
-      if (this._config.entity) {
+      if (this._getEntityId()) {
         this._loadImagesFromEntity();
         return;
       }
@@ -421,7 +422,7 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   private _loadImagesFromEntity(): void {
-    const entityId = this._config?.entity?.trim();
+    const entityId = this._getEntityId();
     if (!entityId) {
       return;
     }
@@ -842,7 +843,7 @@ export class HaImageGalleryCard extends LitElement {
   private _restartRefreshTimer(): void {
     this._clearRefreshTimer();
 
-    if (this._config?.entity) {
+    if (this._getEntityId()) {
       return;
     }
 
@@ -865,6 +866,23 @@ export class HaImageGalleryCard extends LitElement {
 
   public getCardSize(): number {
     return 4;
+  }
+
+  private _getEntityId(): string | undefined {
+    const configured = this._config?.entity?.trim();
+    if (configured) {
+      return configured;
+    }
+
+    if (this.hass?.states?.["camera.latest_snapshot"]) {
+      return "camera.latest_snapshot";
+    }
+
+    if (this.hass?.states?.["camera.lastsnapshot"]) {
+      return "camera.lastsnapshot";
+    }
+
+    return undefined;
   }
 }
 
@@ -915,6 +933,7 @@ class HaImageGalleryCardEditor extends LitElement {
 
   public setConfig(config: ImageGalleryCardConfig): void {
     this._config = {
+      entity: "camera.latest_snapshot",
       sort: "newest_first",
       ...config,
       type: "custom:ha-imagegallery-card"
