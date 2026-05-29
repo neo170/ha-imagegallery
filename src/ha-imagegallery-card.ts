@@ -225,7 +225,7 @@ export class HaImageGalleryCard extends LitElement {
   public static getStubConfig(): ImageGalleryCardConfig {
     return {
       type: "custom:ha-imagegallery-card",
-      entity: "camera.lastsnapshot",
+      entity: "camera.latest_snapshot",
       title: "Kamera Snapshots",
       sort: "newest_first"
     };
@@ -876,7 +876,7 @@ class HaImageGalleryCardEditor extends LitElement {
   @state()
   private _config: ImageGalleryCardConfig = {
     type: "custom:ha-imagegallery-card",
-    entity: "camera.lastsnapshot",
+    entity: "camera.latest_snapshot",
     sort: "newest_first"
   };
 
@@ -927,9 +927,9 @@ class HaImageGalleryCardEditor extends LitElement {
         <div>
           <label>LastSnapshot Kamera Entity</label>
           <input
-            .value=${this._config.entity ?? "camera.lastsnapshot"}
+            .value=${this._config.entity ?? "camera.latest_snapshot"}
             @input=${(ev: InputEvent) => this._onInput("entity", (ev.target as HTMLInputElement).value)}
-            placeholder="camera.lastsnapshot"
+            placeholder="camera.latest_snapshot"
           />
         </div>
 
@@ -954,7 +954,7 @@ class HaImageGalleryCardEditor extends LitElement {
           </select>
         </div>
 
-        <div class="hint">Empfohlen: Entity camera.lastsnapshot aus der ha-lastsnapshot Integration verwenden.</div>
+        <div class="hint">Empfohlen: Entity camera.latest_snapshot aus der ha-lastsnapshot Integration verwenden.</div>
       </div>
     `;
   }

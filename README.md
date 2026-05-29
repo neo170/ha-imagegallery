@@ -10,7 +10,7 @@ Folder watching and in-memory image indexing are provided by the separate integr
 - Swipe left/right image navigation
 - Tap/click to open fullscreen viewer
 - Pinch-to-zoom and pan in fullscreen
-- Works with image list from `camera.lastsnapshot` attribute `images`
+- Works with image list from `camera.latest_snapshot` attribute `images`
 
 ## Installation (HACS)
 
@@ -21,7 +21,7 @@ Folder watching and in-memory image indexing are provided by the separate integr
 ## Required Backend
 
 Install the separate integration repository `ha-lastsnapshot` (HACS type: Integration).
-It exposes image URLs in `camera.lastsnapshot` attributes:
+It exposes image URLs in `camera.latest_snapshot` attributes:
 
 - `images`
 - `latest_image`
@@ -30,13 +30,13 @@ It exposes image URLs in `camera.lastsnapshot` attributes:
 ## Lovelace Config
 
 You can configure the card directly in the Lovelace UI editor (visual editor).
-Set the Last Snapshot camera entity there, usually `camera.lastsnapshot`.
+Set the Last Snapshot camera entity there, usually `camera.latest_snapshot`.
 
 ### Recommended (with backend integration)
 
 ```yaml
 type: custom:ha-imagegallery-card
-entity: camera.lastsnapshot
+entity: camera.latest_snapshot
 title: Kamera Snapshots
 sort: newest_first
 ```
