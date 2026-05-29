@@ -196,24 +196,37 @@ export class HaImageGalleryCard extends LitElement {
       max-height: 100%;
       transform: translate(var(--x), var(--y)) scale(var(--s));
       transform-origin: center center;
+      transition: transform 0.3s ease-out;
       will-change: transform;
       user-select: none;
       pointer-events: none;
+    }
+
+    .overlay-stage img.no-transition {
+      transition: none;
     }
 
     .overlay .nav {
       width: 40px;
       height: 40px;
       font-size: 1.1rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+      padding: 0;
     }
 
     .close {
-      width: auto;
-      border-radius: 10px;
-      padding: 0 12px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      padding: 0;
+      font-size: 1.2rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.08);
     }
 
     @media (max-width: 650px) {
@@ -346,7 +359,7 @@ export class HaImageGalleryCard extends LitElement {
     return html`
       <div class="overlay" @wheel=${this._onWheelZoom}>
         <div class="overlay-top">
-          <button class="close" @click=${this._closeDialog} aria-label="Schliessen">SCHLIESSEN</button>
+          <button class="close" @click=${this._closeDialog} aria-label="Schliessen">✕</button>
           <div>${this._getFileName(currentImage)}</div>
         </div>
 
@@ -362,9 +375,9 @@ export class HaImageGalleryCard extends LitElement {
         </div>
 
         <div class="overlay-bottom">
-          <button class="nav" @click=${this._showPrevious} aria-label="Vorheriges Bild">&#8592;</button>
+          <button class="nav" @click=${this._showPrevious} aria-label="Vorheriges Bild">&#9664;</button>
           <div>${this._index + 1} / ${this._images.length}</div>
-          <button class="nav" @click=${this._showNext} aria-label="Nächstes Bild">&#8594;</button>
+          <button class="nav" @click=${this._showNext} aria-label="Nächstes Bild">&#9654;</button>
         </div>
       </div>
     `;
@@ -851,6 +864,7 @@ export class HaImageGalleryCard extends LitElement {
     this._offsetY = 0;
     this._activePointers.clear();
     this._dragging = false;
+    this.requestUpdate();
   };
 
   private _getFileName(pathValue: string): string {
