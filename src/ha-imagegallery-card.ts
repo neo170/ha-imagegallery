@@ -1478,11 +1478,28 @@ export class HaImageGalleryCard extends LitElement {
     }
   };
 
-  private _onDialogZoomTouchEnd = (_ev: TouchEvent): void => {
+  private _onDialogZoomTouchEnd = (ev: TouchEvent): void => {
     if (this._scale < 1.05) {
       this._resetZoom();
       const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
       stage?.classList.remove("zoom-locked");
+    }
+
+    // Double-tap detection: zoom in when at 1x, zoom out when zoomed
+    if (ev.changedTouches.length === 1 && ev.touches.length === 0) {
+      const touch = ev.changedTouches[0]!;
+      const now = Date.now();
+      const dt = now - this._lastTouchTapTime;
+      const dx = Math.abs(touch.clientX - this._lastTouchTapX);
+      const dy = Math.abs(touch.clientY - this._lastTouchTapY);
+      if (dt > 0 && dt < 320 && dx < 30 && dy < 30) {
+        this._onImageDoubleTap(ev);
+        this._lastTouchTapTime = 0;
+      } else {
+        this._lastTouchTapTime = now;
+        this._lastTouchTapX = touch.clientX;
+        this._lastTouchTapY = touch.clientY;
+      }
     }
   };
 
