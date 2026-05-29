@@ -565,7 +565,8 @@ export class HaImageGalleryCard extends LitElement {
             touch-release-on-edges="false"
             edge-swipe-detection="prevent"
             edge-swipe-threshold="40"
-            @swiperslidechange=${this._onDialogSlideChange}
+            @swiperslidechange=${this._onDialogSlideGesture}
+            @swipertransitionend=${this._onDialogSlideTransitionEnd}
           >
             ${this._images.map(
               (src) => html`
@@ -909,7 +910,15 @@ export class HaImageGalleryCard extends LitElement {
     this._index = swiper.realIndex ?? swiper.activeIndex ?? 0;
   };
 
-  private _onDialogSlideChange = (ev: Event): void => {
+  private _onDialogSlideGesture = (ev: Event): void => {
+    // Intentionally no state update here: rerendering during swipe causes visible overlay/jump on iOS.
+    const swiper = this._getSwiperFromEvent(ev);
+    if (!swiper) {
+      return;
+    }
+  };
+
+  private _onDialogSlideTransitionEnd = (ev: Event): void => {
     const swiper = this._getSwiperFromEvent(ev);
     if (!swiper || this._syncingSwiperIndex) {
       return;
