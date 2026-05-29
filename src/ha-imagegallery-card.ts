@@ -304,6 +304,8 @@ export class HaImageGalleryCard extends LitElement {
       overflow: hidden;
       display: block;
       min-height: 0;
+      padding: 0 10px;
+      box-sizing: border-box;
       touch-action: none;
     }
 
@@ -546,26 +548,24 @@ export class HaImageGalleryCard extends LitElement {
             slides-per-view="1"
             css-mode="false"
             speed="260"
-            loop="true"
-            loop-additional-slides="8"
-            looped-slides="8"
-            max-backface-hidden-slides="200"
+            loop="false"
+            rewind="false"
             zoom="true"
             zoom-max-ratio="4"
             zoom-min-ratio="1"
             zoom-toggle="false"
             allow-touch-move="true"
             simulate-touch="true"
-            resistance-ratio="0.15"
-            threshold="3"
-            long-swipes-ratio="0.18"
-            long-swipes-ms="180"
+            resistance="false"
+            threshold="5"
+            touch-angle="35"
+            follow-finger="true"
             preload-images="true"
             touch-start-prevent-default="true"
             touch-move-stop-propagation="true"
             touch-release-on-edges="false"
             edge-swipe-detection="prevent"
-            edge-swipe-threshold="40"
+            edge-swipe-threshold="80"
             @swiperslidechange=${this._onDialogSlideGesture}
             @swipertransitionend=${this._onDialogSlideTransitionEnd}
           >
@@ -961,9 +961,7 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     if (dialog) {
-      if (typeof dialog.slideToLoop === "function") {
-        dialog.slideToLoop(this._index, 0, false);
-      } else if (typeof dialog.slideTo === "function") {
+      if (typeof dialog.slideTo === "function") {
         dialog.slideTo(this._index, 0, false);
       }
     }
