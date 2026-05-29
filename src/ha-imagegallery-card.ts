@@ -147,6 +147,7 @@ export class HaImageGalleryCard extends LitElement {
     .dialog-swiper {
       width: 100%;
       height: 100%;
+      min-height: 0;
       display: block;
     }
 
@@ -280,8 +281,8 @@ export class HaImageGalleryCard extends LitElement {
     .overlay-stage {
       position: relative;
       overflow: hidden;
-      display: grid;
-      place-items: center;
+      display: block;
+      min-height: 0;
       touch-action: none;
     }
 

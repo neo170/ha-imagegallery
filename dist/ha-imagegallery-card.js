@@ -133,6 +133,7 @@ var os=Object.defineProperty;var ls=Object.getOwnPropertyDescriptor;var Q=(e,i,t
     .dialog-swiper {
       width: 100%;
       height: 100%;
+      min-height: 0;
       display: block;
     }
 
@@ -266,8 +267,8 @@ var os=Object.defineProperty;var ls=Object.getOwnPropertyDescriptor;var Q=(e,i,t
     .overlay-stage {
       position: relative;
       overflow: hidden;
-      display: grid;
-      place-items: center;
+      display: block;
+      min-height: 0;
       touch-action: none;
     }
 
