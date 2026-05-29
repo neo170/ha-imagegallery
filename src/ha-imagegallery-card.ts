@@ -13,6 +13,11 @@ interface ImageGalleryCardConfig {
   refresh_interval?: number;
 }
 
+interface DiscoveryResult {
+  images: string[];
+  reason?: string;
+}
+
 type PointerMap = Map<number, { x: number; y: number }>;
 
 @customElement("ha-imagegallery-card")
@@ -294,7 +299,7 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     if (!this._images.length) {
-      return html`<div class="center">Keine Bilder gefunden. In Home Assistant ist Verzeichnis-Listing oft deaktiviert. Nutze /local/snapshots und lege eine index.json an oder setze images: [] direkt in der Karten-Konfiguration.</div>`;
+      return html`<div class="center">Keine Bilder gefunden</div>`;
     }
 
     return html`<img src=${this._images[this._index]} alt="Gallery image" loading="lazy" />`;
@@ -346,7 +351,11 @@ export class HaImageGalleryCard extends LitElement {
       if (configured.length > 0) {
         images = configured.map((entry) => this._normalizeImageUrl(entry));
       } else {
-        images = await this._discoverImagesFromFolder(this._config.folder ?? "/local/snapshots");
+        const result = await this._discoverImagesFromFolder(this._config.folder ?? "/local/snapshots");
+        images = result.images;
+        if (!images.length && result.reason) {
+          this._error = result.reason;
+        }
       }
 
       this._images = images;
@@ -362,20 +371,25 @@ export class HaImageGalleryCard extends LitElement {
     }
   }
 
-  private async _discoverImagesFromFolder(folder: string): Promise<string[]> {
+  private async _discoverImagesFromFolder(folder: string): Promise<DiscoveryResult> {
     const normalizedFolder = this._normalizeFolder(folder);
 
     const fromIndexJson = await this._fetchIndexJson(normalizedFolder);
     if (fromIndexJson.length > 0) {
-      return fromIndexJson;
+      return { images: fromIndexJson };
     }
 
     const fromDirectoryListing = await this._fetchDirectoryListing(normalizedFolder);
     if (fromDirectoryListing.length > 0) {
-      return fromDirectoryListing;
+      return { images: fromDirectoryListing };
     }
 
-    return [];
+    return {
+      images: [],
+      reason:
+        `Keine Bilder gefunden unter ${normalizedFolder}. ` +
+        `Pruefe ${normalizedFolder}/index.json (HTTP 200) oder setze images: [] direkt in der Karten-Konfiguration.`
+    };
   }
 
   private async _fetchIndexJson(folder: string): Promise<string[]> {
