@@ -127,7 +127,6 @@ export class HaImageGalleryCard extends LitElement {
       color: white;
       gap: 8px;
       background: rgba(0, 0, 0, 0.28);
-      backdrop-filter: blur(2px);
       z-index: 10;
     }
 
@@ -219,7 +218,7 @@ export class HaImageGalleryCard extends LitElement {
 
     @media (max-width: 650px) {
       .viewport {
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 16 / 9;
       }
 
       .caption {
