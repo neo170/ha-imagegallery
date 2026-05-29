@@ -1448,9 +1448,9 @@ export class HaImageGalleryCard extends LitElement {
       return;
     }
     ev.preventDefault();
-    // Proportional zoom: smooth on trackpad and mouse wheel (~18% per notch)
+    // Proportional zoom: smooth on trackpad and mouse wheel (~26% per notch)
     const pixels = ev.deltaMode === 1 ? ev.deltaY * 30 : ev.deltaY;
-    const factor = Math.exp(-pixels * 0.002);
+    const factor = Math.exp(-pixels * 0.003);
     const newScale = this._clamp(this._scale * factor, 1, 6);
     if (newScale <= 1.02) {
       this._resetZoom();
@@ -1484,10 +1484,17 @@ export class HaImageGalleryCard extends LitElement {
       const t2 = ev.touches[1]!;
       this._pinchStartDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       this._pinchStartScale = this._scale;
+      this._pinchStartOffsetX = this._offsetX;
+      this._pinchStartOffsetY = this._offsetY;
       this._isPinching = true;
       // Lock scroll immediately so Swiper doesn't start scrolling
       const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
-      stage?.classList.add("zoom-locked");
+      if (stage) {
+        const rect = stage.getBoundingClientRect();
+        this._pinchStartMidX = (t1.clientX + t2.clientX) / 2 - (rect.left + rect.width / 2);
+        this._pinchStartMidY = (t1.clientY + t2.clientY) / 2 - (rect.top + rect.height / 2);
+        stage.classList.add("zoom-locked");
+      }
     } else if (ev.touches.length === 1 && this._scale > 1) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -1510,7 +1517,15 @@ export class HaImageGalleryCard extends LitElement {
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       const raw = this._pinchStartScale * (dist / this._pinchStartDistance);
       // Rubber-band: allow slight overshoot at limits for tactile feel
-      this._scale = this._rubberBandScale(raw);
+      const newScale = this._rubberBandScale(raw);
+      // Zoom towards the initial pinch midpoint (same principle as cursor zoom on desktop)
+      if (this._pinchStartScale > 0) {
+        const cx = this._pinchStartMidX;
+        const cy = this._pinchStartMidY;
+        this._offsetX = cx - (cx - this._pinchStartOffsetX) * newScale / this._pinchStartScale;
+        this._offsetY = cy - (cy - this._pinchStartOffsetY) * newScale / this._pinchStartScale;
+      }
+      this._scale = newScale;
       const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
       stage?.classList.toggle("zoom-locked", this._scale > 0.98);
       this.requestUpdate();
