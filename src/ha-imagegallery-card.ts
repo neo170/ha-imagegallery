@@ -113,6 +113,9 @@ export class HaImageGalleryCard extends LitElement {
   private _lastTouchTapY = 0;
   private _lastCardSlideChangeAt = 0;
   private _syncingSwiperIndex = false;
+  private _globalTouchStartX = 0;
+  private _globalTouchStartY = 0;
+  private _globalEdgeGuardActive = false;
 
   private _isIOSLikeDevice(): boolean {
     if (typeof navigator === "undefined") {
@@ -428,12 +431,16 @@ export class HaImageGalleryCard extends LitElement {
       this._restartRefreshTimer();
     }
     window.addEventListener("keydown", this._onKeyDown);
+    window.addEventListener("touchstart", this._onGlobalTouchStart, { capture: true, passive: true });
+    window.addEventListener("touchmove", this._onGlobalTouchMove, { capture: true, passive: false });
   }
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRefreshTimer();
     window.removeEventListener("keydown", this._onKeyDown);
+    window.removeEventListener("touchstart", this._onGlobalTouchStart, true);
+    window.removeEventListener("touchmove", this._onGlobalTouchMove, true);
   }
 
   protected willUpdate(changedProps: PropertyValues): void {
@@ -1426,6 +1433,43 @@ export class HaImageGalleryCard extends LitElement {
       dialogSwiper.zoom.in();
     } else {
       dialogSwiper.zoom.out();
+    }
+  };
+
+  private _onGlobalTouchStart = (ev: TouchEvent): void => {
+    if (!this._dialogOpen || !this._isIOSLikeDevice() || ev.touches.length !== 1) {
+      this._globalEdgeGuardActive = false;
+      return;
+    }
+
+    const touch = ev.touches[0];
+    if (!touch) {
+      this._globalEdgeGuardActive = false;
+      return;
+    }
+
+    this._globalTouchStartX = touch.clientX;
+    this._globalTouchStartY = touch.clientY;
+    const edge = 24;
+    this._globalEdgeGuardActive = touch.clientX <= edge || touch.clientX >= window.innerWidth - edge;
+  };
+
+  private _onGlobalTouchMove = (ev: TouchEvent): void => {
+    if (!this._dialogOpen || !this._isIOSLikeDevice() || !this._globalEdgeGuardActive || ev.touches.length !== 1) {
+      return;
+    }
+
+    const touch = ev.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    const dx = touch.clientX - this._globalTouchStartX;
+    const dy = touch.clientY - this._globalTouchStartY;
+
+    if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) {
+      ev.preventDefault();
+      ev.stopPropagation();
     }
   };
 
