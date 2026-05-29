@@ -611,9 +611,9 @@ export class HaImageGalleryCard extends LitElement {
         </div>
 
         <div class="overlay-bottom">
-          <button class="nav" @click=${this._showPrevious} aria-label="Vorheriges Bild">&#9664;</button>
+          <button class="nav" @click=${this._showPrevious} @touchend=${this._showPreviousFromTouch} aria-label="Vorheriges Bild">&#9664;</button>
           <div>${this._index + 1} / ${this._images.length}</div>
-          <button class="nav" @click=${this._showNext} aria-label="Nächstes Bild">&#9654;</button>
+          <button class="nav" @click=${this._showNext} @touchend=${this._showNextFromTouch} aria-label="Nächstes Bild">&#9654;</button>
         </div>
       </div>
     `;
@@ -1041,6 +1041,18 @@ export class HaImageGalleryCard extends LitElement {
     ev.preventDefault();
     ev.stopPropagation();
     this._closeDialog();
+  };
+
+  private _showPreviousFromTouch = (ev: TouchEvent): void => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this._showPrevious();
+  };
+
+  private _showNextFromTouch = (ev: TouchEvent): void => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this._showNext();
   };
 
   private _onViewportKeydown = (ev: KeyboardEvent): void => {
