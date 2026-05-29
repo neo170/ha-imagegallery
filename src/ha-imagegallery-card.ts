@@ -373,6 +373,8 @@ export class HaImageGalleryCard extends LitElement {
       background: rgba(255, 255, 255, 0.08);
       border-radius: 50%;
       padding: 0;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .close {
@@ -1617,6 +1619,14 @@ export class HaImageGalleryCard extends LitElement {
 
     this._globalTouchStartX = touch.clientX;
     this._globalTouchStartY = touch.clientY;
+
+    // Never intercept touches on interactive elements (buttons, links)
+    const target = ev.target as Element | null;
+    if (target?.closest('button, a')) {
+      this._globalEdgeGuardActive = false;
+      return;
+    }
+
     const edge = 50;
     const isEdge = touch.clientX <= edge || touch.clientX >= window.innerWidth - edge;
     this._globalEdgeGuardActive = isEdge;
