@@ -182,6 +182,14 @@ export class HaImageGalleryCard extends LitElement {
       user-select: none;
     }
 
+    .dialog-slide img {
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
     .dialog-slide .swiper-zoom-container {
       width: 100%;
       height: 100%;
@@ -524,7 +532,6 @@ export class HaImageGalleryCard extends LitElement {
 
   private _renderDialog(): TemplateResult {
     const currentImage = this._images[this._index];
-    const fullscreenCssMode = this._isIOSLikeDevice() ? "true" : "false";
 
     return html`
       <div class="overlay" @wheel=${this._onDialogWheelZoom}>
@@ -537,10 +544,13 @@ export class HaImageGalleryCard extends LitElement {
           <swiper-container
             class="dialog-swiper"
             slides-per-view="1"
-            css-mode=${fullscreenCssMode}
+            css-mode="false"
             speed="260"
             rewind="true"
             zoom="true"
+            zoom-max-ratio="4"
+            zoom-min-ratio="1"
+            zoom-toggle="false"
             allow-touch-move="true"
             simulate-touch="true"
             resistance-ratio="0.15"
