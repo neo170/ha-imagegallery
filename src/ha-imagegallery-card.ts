@@ -1448,15 +1448,24 @@ export class HaImageGalleryCard extends LitElement {
       return;
     }
     ev.preventDefault();
-    // Proportional zoom: smooth on trackpad (small pixel deltas) and mouse wheel (line deltas)
+    // Proportional zoom: smooth on trackpad and mouse wheel (~18% per notch)
     const pixels = ev.deltaMode === 1 ? ev.deltaY * 30 : ev.deltaY;
-    const factor = Math.exp(-pixels * 0.0012);
+    const factor = Math.exp(-pixels * 0.002);
     const newScale = this._clamp(this._scale * factor, 1, 6);
     if (newScale <= 1.02) {
       this._resetZoom();
-    } else {
-      this._scale = newScale;
+      return;
     }
+    // Zoom towards the cursor: keep the image point under the cursor fixed
+    const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+    if (stage) {
+      const rect = stage.getBoundingClientRect();
+      const cx = ev.clientX - (rect.left + rect.width / 2);
+      const cy = ev.clientY - (rect.top + rect.height / 2);
+      this._offsetX = cx - (cx - this._offsetX) * newScale / this._scale;
+      this._offsetY = cy - (cy - this._offsetY) * newScale / this._scale;
+    }
+    this._scale = newScale;
   };
 
   private _onDialogZoomTouchStart = (ev: TouchEvent): void => {
