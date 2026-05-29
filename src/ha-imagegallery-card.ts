@@ -91,17 +91,13 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     .title {
-      font-size: 1.05rem;
-      font-weight: 650;
-      letter-spacing: 0.02em;
-      padding: 14px 16px 0;
+      display: none;
     }
 
     .viewport {
       position: relative;
       width: 100%;
-      aspect-ratio: 16 / 10;
-      margin-top: 8px;
+      aspect-ratio: 16 / 9;
       overflow: hidden;
       background: rgba(255, 255, 255, 0.04);
       touch-action: pan-y;
