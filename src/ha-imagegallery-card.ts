@@ -84,6 +84,9 @@ export class HaImageGalleryCard extends LitElement {
   private _lastTapTime = 0;
   private _lastTapX = 0;
   private _lastTapY = 0;
+  private _tapStartX = 0;
+  private _tapStartY = 0;
+  private _tapCandidate = false;
 
   static styles = css`
     :host {
@@ -264,7 +267,7 @@ export class HaImageGalleryCard extends LitElement {
       inset: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 16px;
       transition: transform 0.22s ease-out;
       will-change: transform;
@@ -458,7 +461,7 @@ export class HaImageGalleryCard extends LitElement {
     const prevIndex = (this._index - 1 + this._images.length) % this._images.length;
     const nextIndex = (this._index + 1) % this._images.length;
     const swipeShift = this._scale <= 1 ? this._overlaySwipeDeltaX : 0;
-    const trackStyle = `transform: translateX(${swipeShift}px);`;
+    const trackStyle = `transform: translateX(calc(-100% - 16px + ${swipeShift}px));`;
 
     const prevImageStyle = `--s:1;--x:0px;--y:0px;`;
     const currentImageStyle = `--s:${this._scale};--x:${this._offsetX}px;--y:${this._offsetY}px;`;
@@ -881,21 +884,9 @@ export class HaImageGalleryCard extends LitElement {
 
     this._activePointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
-    if (this._activePointers.size === 1 && this._scale <= 1) {
-      const now = Date.now();
-      const dt = now - this._lastTapTime;
-      const dx = Math.abs(ev.clientX - this._lastTapX);
-      const dy = Math.abs(ev.clientY - this._lastTapY);
-
-      if (dt > 0 && dt < 320 && dx < 24 && dy < 24) {
-        this._onImageDoubleTap(ev);
-        this._lastTapTime = 0;
-      } else {
-        this._lastTapTime = now;
-        this._lastTapX = ev.clientX;
-        this._lastTapY = ev.clientY;
-      }
-    }
+    this._tapStartX = ev.clientX;
+    this._tapStartY = ev.clientY;
+    this._tapCandidate = this._activePointers.size === 1;
 
     if (this._activePointers.size === 2) {
       const [a, b] = Array.from(this._activePointers.values());
@@ -920,7 +911,7 @@ export class HaImageGalleryCard extends LitElement {
         // Track horizontal swipe for image navigation at 1x zoom
         this._overlaySwipeStartX = ev.clientX;
         this._overlaySwipeDeltaX = 0;
-        this._overlayIsSwiping = true;
+        this._overlayIsSwiping = false;
       }
     }
   };
@@ -954,6 +945,14 @@ export class HaImageGalleryCard extends LitElement {
     } else if (this._activePointers.size === 1 && this._scale <= 1) {
       // Horizontal swipe for navigation at 1x zoom
       this._overlaySwipeDeltaX = ev.clientX - this._overlaySwipeStartX;
+      if (Math.abs(this._overlaySwipeDeltaX) > 8) {
+        this._overlayIsSwiping = true;
+      }
+
+      if (Math.abs(ev.clientX - this._tapStartX) > 10 || Math.abs(ev.clientY - this._tapStartY) > 10) {
+        this._tapCandidate = false;
+      }
+
       this._offsetX = 0;
       this._offsetY = 0;
     }
@@ -968,6 +967,7 @@ export class HaImageGalleryCard extends LitElement {
 
     if (this._activePointers.size === 0) {
       this._dragging = false;
+      const wasSwiping = this._overlayIsSwiping;
       this._overlayIsSwiping = false;
 
       // Handle horizontal swipe for image navigation at 1x zoom
@@ -978,7 +978,25 @@ export class HaImageGalleryCard extends LitElement {
           this._showPrevious();
         }
       }
+
+      if (!wasSwiping && this._tapCandidate) {
+        const now = Date.now();
+        const dt = now - this._lastTapTime;
+        const dx = Math.abs(ev.clientX - this._lastTapX);
+        const dy = Math.abs(ev.clientY - this._lastTapY);
+
+        if (dt > 0 && dt < 320 && dx < 24 && dy < 24) {
+          this._onImageDoubleTap(ev);
+          this._lastTapTime = 0;
+        } else {
+          this._lastTapTime = now;
+          this._lastTapX = ev.clientX;
+          this._lastTapY = ev.clientY;
+        }
+      }
+
       this._overlaySwipeDeltaX = 0;
+      this._tapCandidate = false;
     }
 
     if (this._scale <= 1) {
