@@ -72,6 +72,10 @@ export class HaImageGalleryCard extends LitElement {
   @state()
   private _offsetY = 0;
 
+  @state()
+  private _dialogZoomAnimate = false;
+
+  private _zoomAnimationTimer?: number;
   private _refreshTimer?: number;
   private _touchStartX = 0;
   private _touchStartY = 0;
@@ -197,6 +201,10 @@ export class HaImageGalleryCard extends LitElement {
 
     .overlay-stage.zoom-locked {
       touch-action: none;
+    }
+
+    .overlay-stage.zoom-animating .dialog-slide img {
+      transition: transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .viewport-track {
@@ -439,6 +447,10 @@ export class HaImageGalleryCard extends LitElement {
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("touchstart", this._onGlobalTouchStart, true);
     window.removeEventListener("touchmove", this._onGlobalTouchMove, true);
+    if (this._zoomAnimationTimer) {
+      window.clearTimeout(this._zoomAnimationTimer);
+      this._zoomAnimationTimer = undefined;
+    }
   }
 
   protected willUpdate(changedProps: PropertyValues): void {
@@ -550,7 +562,7 @@ export class HaImageGalleryCard extends LitElement {
           <div>${this._getFileName(currentImage)}</div>
         </div>
 
-        <div class="overlay-stage ${this._scale > 1 ? 'zoom-locked' : ''}"
+        <div class="overlay-stage ${(this._scale > 1 || this._dialogZoomAnimate) ? 'zoom-locked' : ''} ${this._dialogZoomAnimate ? 'zoom-animating' : ''}"
           @touchstart=${this._onDialogZoomTouchStart}
           @touchmove=${this._onDialogZoomTouchMove}
           @touchend=${this._onDialogZoomTouchEnd}
@@ -579,7 +591,7 @@ export class HaImageGalleryCard extends LitElement {
               (src) => html`
                 <swiper-slide class="dialog-slide">
                   <img src=${src} alt="Fullscreen image" loading="eager" draggable="false"
-                    style=${src === currentImage && (this._scale !== 1 || this._offsetX !== 0 || this._offsetY !== 0)
+                    style=${src === currentImage
                       ? `transform: translate(${this._offsetX}px, ${this._offsetY}px) scale(${this._scale})`
                       : ''}
                   />
@@ -1409,14 +1421,24 @@ export class HaImageGalleryCard extends LitElement {
 
   private _onImageDoubleTap = (ev?: Event): void => {
     ev?.stopPropagation();
+    if (this._zoomAnimationTimer) {
+      window.clearTimeout(this._zoomAnimationTimer);
+      this._zoomAnimationTimer = undefined;
+    }
+    this._dialogZoomAnimate = true;
     if (this._scale > 1) {
-      this._resetZoom();
+      this._scale = 1;
+      this._offsetX = 0;
+      this._offsetY = 0;
     } else {
       this._scale = 2;
       this._offsetX = 0;
       this._offsetY = 0;
-      this.requestUpdate();
     }
+    this._zoomAnimationTimer = window.setTimeout(() => {
+      this._dialogZoomAnimate = false;
+      this._zoomAnimationTimer = undefined;
+    }, 350);
   };
 
   private _onDialogWheelZoom = (ev: WheelEvent): void => {
@@ -1438,12 +1460,21 @@ export class HaImageGalleryCard extends LitElement {
     if (!this._dialogOpen) return;
 
     if (ev.touches.length === 2) {
+      // Cancel any in-progress animation so new pinch starts from the settled position
+      if (this._zoomAnimationTimer) {
+        window.clearTimeout(this._zoomAnimationTimer);
+        this._zoomAnimationTimer = undefined;
+        this._dialogZoomAnimate = false;
+      }
       ev.preventDefault();
       ev.stopPropagation();
       const t1 = ev.touches[0]!;
       const t2 = ev.touches[1]!;
       this._pinchStartDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       this._pinchStartScale = this._scale;
+      // Lock scroll immediately so Swiper doesn't start scrolling
+      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+      stage?.classList.add("zoom-locked");
     } else if (ev.touches.length === 1 && this._scale > 1) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -1464,9 +1495,11 @@ export class HaImageGalleryCard extends LitElement {
       const t1 = ev.touches[0]!;
       const t2 = ev.touches[1]!;
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      this._scale = this._clamp(this._pinchStartScale * (dist / this._pinchStartDistance), 1, 4);
+      const raw = this._pinchStartScale * (dist / this._pinchStartDistance);
+      // Rubber-band: allow slight overshoot at limits for tactile feel
+      this._scale = this._rubberBandScale(raw);
       const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
-      stage?.classList.toggle("zoom-locked", this._scale > 1);
+      stage?.classList.toggle("zoom-locked", this._scale > 0.98);
       this.requestUpdate();
     } else if (ev.touches.length === 1 && this._scale > 1) {
       ev.preventDefault();
@@ -1479,9 +1512,38 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onDialogZoomTouchEnd = (ev: TouchEvent): void => {
-    if (this._scale < 1.05) {
-      this._resetZoom();
-      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+    const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+
+    // Clear any pending animation timer
+    if (this._zoomAnimationTimer) {
+      window.clearTimeout(this._zoomAnimationTimer);
+      this._zoomAnimationTimer = undefined;
+    }
+
+    const ZOOM_MIN = 1, ZOOM_MAX = 4;
+
+    if (this._scale < ZOOM_MIN || this._scale > ZOOM_MAX) {
+      // Rubber-band snap-back: animate to the clamped limit
+      const target = this._clamp(this._scale, ZOOM_MIN, ZOOM_MAX);
+      this._dialogZoomAnimate = true;
+      this._scale = target;
+      if (target <= 1) {
+        this._offsetX = 0;
+        this._offsetY = 0;
+      }
+      this._zoomAnimationTimer = window.setTimeout(() => {
+        this._dialogZoomAnimate = false;
+        this._zoomAnimationTimer = undefined;
+        if (this._scale <= 1) stage?.classList.remove("zoom-locked");
+      }, 350);
+      return; // no double-tap check after a pinch release
+    }
+
+    if (this._scale < ZOOM_MIN + 0.05) {
+      // Barely zoomed: instant reset
+      this._scale = 1;
+      this._offsetX = 0;
+      this._offsetY = 0;
       stage?.classList.remove("zoom-locked");
     }
 
@@ -1555,13 +1617,24 @@ export class HaImageGalleryCard extends LitElement {
     return Math.max(min, Math.min(max, value));
   }
 
+  private _rubberBandScale(raw: number): number {
+    const min = 1, max = 4;
+    if (raw < min) return min - (min - raw) * 0.35;
+    if (raw > max) return max + (raw - max) * 0.35;
+    return raw;
+  }
+
   private _resetZoom = (): void => {
+    if (this._zoomAnimationTimer) {
+      window.clearTimeout(this._zoomAnimationTimer);
+      this._zoomAnimationTimer = undefined;
+    }
+    this._dialogZoomAnimate = false;
     this._scale = 1;
     this._offsetX = 0;
     this._offsetY = 0;
     this._activePointers.clear();
     this._dragging = false;
-    this.requestUpdate();
   };
 
   private _getFileName(pathValue: string): string {
