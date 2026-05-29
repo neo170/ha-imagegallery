@@ -1,5 +1,8 @@
 import { LitElement, css, html, PropertyValues, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { register } from "swiper/element/bundle";
+
+register();
 
 interface HomeAssistant {
   locale: { language: string };
@@ -26,6 +29,16 @@ interface DiscoveryResult {
 }
 
 type PointerMap = Map<number, { x: number; y: number }>;
+
+type SwiperLike = {
+  activeIndex: number;
+  realIndex: number;
+  slideNext: (speed?: number) => void;
+  slidePrev: (speed?: number) => void;
+  slideToLoop?: (index: number, speed?: number, runCallbacks?: boolean) => void;
+  slideTo?: (index: number, speed?: number, runCallbacks?: boolean) => void;
+  zoom?: { out: () => void };
+};
 
 @customElement("ha-imagegallery-card")
 export class HaImageGalleryCard extends LitElement {
@@ -98,6 +111,8 @@ export class HaImageGalleryCard extends LitElement {
   private _lastTouchTapTime = 0;
   private _lastTouchTapX = 0;
   private _lastTouchTapY = 0;
+  private _lastCardSlideChangeAt = 0;
+  private _syncingSwiperIndex = false;
 
   static styles = css`
     :host {
@@ -126,6 +141,40 @@ export class HaImageGalleryCard extends LitElement {
       touch-action: pan-y;
       cursor: pointer;
       user-select: none;
+    }
+
+    .card-swiper,
+    .dialog-swiper {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .card-slide,
+    .dialog-slide {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.14);
+    }
+
+    .card-slide img,
+    .dialog-slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      user-select: none;
+    }
+
+    .dialog-slide .swiper-zoom-container {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
     }
 
     .viewport-track {
@@ -369,9 +418,17 @@ export class HaImageGalleryCard extends LitElement {
     }
   }
 
+  protected firstUpdated(): void {
+    this._syncSwipersToIndex();
+  }
+
   protected updated(changedProps: PropertyValues): void {
     if (changedProps.has("hass") && this._getEntityId()) {
       this._loadImagesFromEntity();
+    }
+
+    if (changedProps.has("_dialogOpen") || changedProps.has("_index") || changedProps.has("_images")) {
+      this._syncSwipersToIndex();
     }
   }
 
@@ -388,10 +445,6 @@ export class HaImageGalleryCard extends LitElement {
 
         <div
           class="viewport"
-          @touchstart=${this._onCardSwipeStart}
-          @touchmove=${this._onCardSwipeMove}
-          @touchend=${this._onCardSwipeEnd}
-          @touchcancel=${this._onCardSwipeEnd}
           @click=${this._onViewportClick}
           role="button"
           tabindex="0"
@@ -426,68 +479,58 @@ export class HaImageGalleryCard extends LitElement {
       return html`<div class="center">Keine Bilder gefunden</div>`;
     }
 
-    const prevIndex = (this._index - 1 + this._images.length) % this._images.length;
-    const nextIndex = (this._index + 1) % this._images.length;
-    const trackStyle = `transform: translateX(calc(-100% - 10px + ${this._cardSwipeDeltaX}px));`;
-    const trackClass = this._cardIsSwiping ? "viewport-track no-transition" : "viewport-track";
-
     return html`
-      <div class=${trackClass} style=${trackStyle}>
-        <div class="viewport-slide">
-          <img src=${this._images[prevIndex]} alt="Vorheriges Bild" loading="lazy" />
-        </div>
-        <div class="viewport-slide">
-          <img src=${this._images[this._index]} alt="Gallery image" loading="lazy" />
-        </div>
-        <div class="viewport-slide">
-          <img src=${this._images[nextIndex]} alt="Naechstes Bild" loading="lazy" />
-        </div>
-      </div>
+      <swiper-container
+        class="card-swiper"
+        slides-per-view="1"
+        speed="260"
+        loop="true"
+        resistance-ratio="0.75"
+        threshold="6"
+        @swiperslidechange=${this._onCardSlideChange}
+      >
+        ${this._images.map(
+          (src) => html`
+            <swiper-slide class="card-slide">
+              <img src=${src} alt="Gallery image" loading="lazy" draggable="false" />
+            </swiper-slide>
+          `
+        )}
+      </swiper-container>
     `;
   }
 
   private _renderDialog(): TemplateResult {
     const currentImage = this._images[this._index];
-    const prevIndex = (this._index - 1 + this._images.length) % this._images.length;
-    const nextIndex = (this._index + 1) % this._images.length;
-    const swipeShift = this._scale <= 1 ? this._overlaySwipeDeltaX : 0;
-    const trackStyle = `transform: translateX(calc(-100% - 16px + ${swipeShift}px));`;
-
-    const prevImageStyle = `--s:1;--x:0px;--y:0px;`;
-    const currentImageStyle = `--s:${this._scale};--x:${this._offsetX}px;--y:${this._offsetY}px;`;
-    const nextImageStyle = `--s:1;--x:0px;--y:0px;`;
-    const currentImageClass = this._scale > 1 || this._overlayIsSwiping ? "no-transition" : "";
-    const trackClass = this._overlayIsSwiping ? "overlay-track no-transition" : "overlay-track";
 
     return html`
-      <div class="overlay" @wheel=${this._onWheelZoom}>
+      <div class="overlay">
         <div class="overlay-top">
           <button class="close" @click=${this._closeDialog} @touchend=${this._closeDialogFromTouch} aria-label="Schliessen">✕</button>
           <div>${this._getFileName(currentImage)}</div>
         </div>
 
-        <div
-          class="overlay-stage"
-          @pointerdown=${this._onOverlayPointerDown}
-          @pointermove=${this._onOverlayPointerMove}
-          @pointerup=${this._onOverlayPointerUp}
-          @pointercancel=${this._onOverlayPointerUp}
-          @touchstart=${this._onOverlayTouchStart}
-          @touchmove=${this._onOverlayTouchMove}
-          @touchend=${this._onOverlayTouchEnd}
-          @dblclick=${this._onImageDoubleTap}
-        >
-          <div class=${trackClass} style=${trackStyle}>
-            <div class="overlay-slide">
-              <img src=${this._images[prevIndex]} alt="Vorheriges Bild" style=${prevImageStyle} draggable="false" />
-            </div>
-            <div class="overlay-slide">
-              <img src=${currentImage} alt="Fullscreen image" style=${currentImageStyle} class=${currentImageClass} draggable="false" />
-            </div>
-            <div class="overlay-slide">
-              <img src=${this._images[nextIndex]} alt="Naechstes Bild" style=${nextImageStyle} draggable="false" />
-            </div>
-          </div>
+        <div class="overlay-stage">
+          <swiper-container
+            class="dialog-swiper"
+            slides-per-view="1"
+            speed="260"
+            loop="true"
+            zoom="true"
+            resistance-ratio="0.75"
+            threshold="6"
+            @swiperslidechange=${this._onDialogSlideChange}
+          >
+            ${this._images.map(
+              (src) => html`
+                <swiper-slide class="dialog-slide">
+                  <div class="swiper-zoom-container">
+                    <img src=${src} alt="Fullscreen image" draggable="false" />
+                  </div>
+                </swiper-slide>
+              `
+            )}
+          </swiper-container>
         </div>
 
         <div class="overlay-bottom">
@@ -770,19 +813,29 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   private _showPrevious = (): void => {
+    const swiper = this._getActiveSwiper();
+    if (swiper) {
+      swiper.slidePrev(220);
+      return;
+    }
+
     if (!this._images.length) {
       return;
     }
     this._index = (this._index - 1 + this._images.length) % this._images.length;
-    this._resetZoom();
   };
 
   private _showNext = (): void => {
+    const swiper = this._getActiveSwiper();
+    if (swiper) {
+      swiper.slideNext(220);
+      return;
+    }
+
     if (!this._images.length) {
       return;
     }
     this._index = (this._index + 1) % this._images.length;
-    this._resetZoom();
   };
 
   private _openDialog = (): void => {
@@ -793,13 +846,74 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onViewportClick = (ev: MouseEvent): void => {
-    if (Date.now() < this._cardSuppressOpenUntil || this._cardIsSwiping || this._cardSwipeAnimating) {
+    if (Date.now() - this._lastCardSlideChangeAt < 220) {
       ev.preventDefault();
       ev.stopPropagation();
       return;
     }
     this._openDialog();
   };
+
+  private _onCardSlideChange = (ev: Event): void => {
+    const swiper = this._getSwiperFromEvent(ev);
+    if (!swiper || this._syncingSwiperIndex) {
+      return;
+    }
+    this._lastCardSlideChangeAt = Date.now();
+    this._index = swiper.realIndex ?? swiper.activeIndex ?? 0;
+  };
+
+  private _onDialogSlideChange = (ev: Event): void => {
+    const swiper = this._getSwiperFromEvent(ev);
+    if (!swiper || this._syncingSwiperIndex) {
+      return;
+    }
+    this._index = swiper.realIndex ?? swiper.activeIndex ?? 0;
+  };
+
+  private _getSwiperFromEvent(ev: Event): SwiperLike | undefined {
+    const custom = ev as CustomEvent<unknown[]>;
+    const candidate = custom.detail?.[0] as SwiperLike | undefined;
+    return candidate;
+  }
+
+  private _getCardSwiper(): SwiperLike | undefined {
+    const el = this.renderRoot?.querySelector(".card-swiper") as { swiper?: SwiperLike } | null;
+    return el?.swiper;
+  }
+
+  private _getDialogSwiper(): SwiperLike | undefined {
+    const el = this.renderRoot?.querySelector(".dialog-swiper") as { swiper?: SwiperLike } | null;
+    return el?.swiper;
+  }
+
+  private _getActiveSwiper(): SwiperLike | undefined {
+    return this._dialogOpen ? this._getDialogSwiper() : this._getCardSwiper();
+  }
+
+  private _syncSwipersToIndex(): void {
+    const card = this._getCardSwiper();
+    const dialog = this._getDialogSwiper();
+    this._syncingSwiperIndex = true;
+
+    if (card) {
+      if (typeof card.slideToLoop === "function") {
+        card.slideToLoop(this._index, 0, false);
+      } else if (typeof card.slideTo === "function") {
+        card.slideTo(this._index, 0, false);
+      }
+    }
+
+    if (dialog) {
+      if (typeof dialog.slideToLoop === "function") {
+        dialog.slideToLoop(this._index, 0, false);
+      } else if (typeof dialog.slideTo === "function") {
+        dialog.slideTo(this._index, 0, false);
+      }
+    }
+
+    this._syncingSwiperIndex = false;
+  }
 
   private _animateSwipe = (direction: 'left' | 'right'): void => {
     this.requestUpdate();
