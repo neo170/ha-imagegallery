@@ -88,6 +88,7 @@ export class HaImageGalleryCard extends LitElement {
       background: white;
       color: #333333;
       position: relative;
+      padding: 0;
     }
 
     .title {
@@ -99,7 +100,7 @@ export class HaImageGalleryCard extends LitElement {
       width: 100%;
       aspect-ratio: 16 / 9;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(0, 0, 0, 0.14);
       touch-action: pan-y;
       cursor: pointer;
       user-select: none;
@@ -114,13 +115,19 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     .caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px 12px;
+      padding: 16px 16px 20px;
       font-size: 0.88rem;
-      color: #333333;
+      color: white;
       gap: 8px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+      z-index: 10;
     }
 
     .controls {
@@ -129,8 +136,8 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     button {
-      border: 1px solid rgba(100, 100, 100, 0.3);
-      background: rgba(100, 100, 100, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.15);
       color: inherit;
       border-radius: 999px;
       width: 34px;
@@ -299,13 +306,13 @@ export class HaImageGalleryCard extends LitElement {
           @keydown=${this._onViewportKeydown}
         >
           ${this._renderMainContent()}
-        </div>
 
-        <div class="caption">
-          <div>${this._images.length ? this._getFileName(this._images[this._index]) : "-"}</div>
-          <div class="controls">
-            <button @click=${this._showPrevious} title="Vorheriges Bild" aria-label="Vorheriges Bild">&#8592;</button>
-            <button @click=${this._showNext} title="Nächstes Bild" aria-label="Nächstes Bild">&#8594;</button>
+          <div class="caption">
+            <div>${this._images.length ? this._getFileName(this._images[this._index]) : "-"}</div>
+            <div class="controls">
+              <button @click=${this._showPrevious} title="Vorheriges Bild" aria-label="Vorheriges Bild">&#8592;</button>
+              <button @click=${this._showNext} title="Nächstes Bild" aria-label="Nächstes Bild">&#8594;</button>
+            </div>
           </div>
         </div>
       </ha-card>
