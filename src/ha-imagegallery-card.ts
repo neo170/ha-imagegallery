@@ -249,7 +249,7 @@ export class HaImageGalleryCard extends LitElement {
       justify-content: space-between;
       padding: 6px 12px 8px;
       font-size: 1.11rem;
-      font-weight: 600;
+      font-weight: 500;
       color: white;
       gap: 8px;
       background: rgba(0, 0, 0, 0.28);
@@ -308,6 +308,10 @@ export class HaImageGalleryCard extends LitElement {
       padding: 10px 14px;
       color: #ebf1f8;
       gap: 10px;
+    }
+
+    .overlay-bottom {
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
     }
 
     .overlay-stage {
