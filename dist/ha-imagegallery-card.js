@@ -85,7 +85,7 @@ var os=Object.defineProperty;var ls=Object.getOwnPropertyDescriptor;var Q=(e,i,t
             slides-per-view="1"
             css-mode="false"
             speed="260"
-            rewind="true"
+            loop="true"
             zoom="true"
             zoom-max-ratio="4"
             zoom-min-ratio="1"

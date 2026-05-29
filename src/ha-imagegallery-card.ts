@@ -546,7 +546,7 @@ export class HaImageGalleryCard extends LitElement {
             slides-per-view="1"
             css-mode="false"
             speed="260"
-            rewind="true"
+            loop="true"
             zoom="true"
             zoom-max-ratio="4"
             zoom-min-ratio="1"
