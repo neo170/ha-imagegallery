@@ -37,7 +37,7 @@ type SwiperLike = {
   slidePrev: (speed?: number) => void;
   slideToLoop?: (index: number, speed?: number, runCallbacks?: boolean) => void;
   slideTo?: (index: number, speed?: number, runCallbacks?: boolean) => void;
-  zoom?: { out: () => void };
+  zoom?: { in: (ratio?: number) => void; out: () => void; scale?: number };
 };
 
 @customElement("ha-imagegallery-card")
@@ -485,7 +485,7 @@ export class HaImageGalleryCard extends LitElement {
         class="card-swiper"
         slides-per-view="1"
         speed="260"
-        loop="true"
+        rewind="true"
         resistance-ratio="0.75"
         threshold="6"
         @swiperslidechange=${this._onCardSlideChange}
@@ -505,7 +505,7 @@ export class HaImageGalleryCard extends LitElement {
     const currentImage = this._images[this._index];
 
     return html`
-      <div class="overlay">
+      <div class="overlay" @wheel=${this._onDialogWheelZoom}>
         <div class="overlay-top">
           <button class="close" @click=${this._closeDialog} @touchend=${this._closeDialogFromTouch} aria-label="Schliessen">✕</button>
           <div>${this._getFileName(currentImage)}</div>
@@ -516,10 +516,15 @@ export class HaImageGalleryCard extends LitElement {
             class="dialog-swiper"
             slides-per-view="1"
             speed="260"
-            loop="true"
+            rewind="true"
             zoom="true"
             resistance-ratio="0.75"
             threshold="6"
+            touch-start-prevent-default="true"
+            touch-move-stop-propagation="true"
+            touch-release-on-edges="false"
+            edge-swipe-detection="prevent"
+            edge-swipe-threshold="40"
             @swiperslidechange=${this._onDialogSlideChange}
           >
             ${this._images.map(
@@ -945,6 +950,8 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _closeDialog = (): void => {
+    const dialogSwiper = this._getDialogSwiper();
+    dialogSwiper?.zoom?.out();
     this._dialogOpen = false;
     this._activePointers.clear();
     this._dragging = false;
@@ -1344,8 +1351,33 @@ export class HaImageGalleryCard extends LitElement {
 
   private _onImageDoubleTap = (ev?: Event): void => {
     ev?.stopPropagation();
+    const dialogSwiper = this._getDialogSwiper();
+    const currentScale = dialogSwiper?.zoom?.scale ?? 1;
+    if (currentScale > 1) {
+      dialogSwiper?.zoom?.out();
+      return;
+    }
+
     if (this._scale > 1) {
       this._resetZoom();
+    }
+  };
+
+  private _onDialogWheelZoom = (ev: WheelEvent): void => {
+    if (!this._dialogOpen || !ev.ctrlKey) {
+      return;
+    }
+
+    ev.preventDefault();
+    const dialogSwiper = this._getDialogSwiper();
+    if (!dialogSwiper?.zoom) {
+      return;
+    }
+
+    if (ev.deltaY < 0) {
+      dialogSwiper.zoom.in();
+    } else {
+      dialogSwiper.zoom.out();
     }
   };
 
