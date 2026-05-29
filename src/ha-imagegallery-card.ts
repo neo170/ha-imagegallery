@@ -122,29 +122,31 @@ export class HaImageGalleryCard extends LitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 16px 20px;
+      padding: 8px 12px 10px;
       font-size: 0.88rem;
       color: white;
       gap: 8px;
-      background: rgba(0, 0, 0, 0.42);
+      background: rgba(0, 0, 0, 0.28);
       backdrop-filter: blur(2px);
       z-index: 10;
     }
 
     .controls {
       display: flex;
-      gap: 8px;
+      gap: 4px;
     }
 
     button {
       border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.08);
       color: inherit;
       border-radius: 999px;
-      width: 34px;
-      height: 34px;
+      width: 26px;
+      height: 26px;
       cursor: pointer;
-      font-size: 0.95rem;
+      font-size: 0.7rem;
+      line-height: 1;
+      padding: 0;
     }
 
     button:focus-visible {
@@ -311,8 +313,8 @@ export class HaImageGalleryCard extends LitElement {
           <div class="caption" @click=${this._stopEvent}>
             <div>${this._images.length ? this._getFileName(this._images[this._index]) : "-"}</div>
             <div class="controls" @click=${this._stopEvent}>
-              <button @click=${this._showPreviousFromButton} title="Vorheriges Bild" aria-label="Vorheriges Bild">&#8592;</button>
-              <button @click=${this._showNextFromButton} title="Nächstes Bild" aria-label="Nächstes Bild">&#8594;</button>
+              <button @click=${this._showPreviousFromButton} title="Vorheriges Bild" aria-label="Vorheriges Bild">&#9664;</button>
+              <button @click=${this._showNextFromButton} title="Nächstes Bild" aria-label="Nächstes Bild">&#9654;</button>
             </div>
           </div>
         </div>
