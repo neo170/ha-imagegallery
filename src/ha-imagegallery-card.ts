@@ -77,8 +77,6 @@ export class HaImageGalleryCard extends LitElement {
 
   private _zoomAnimationTimer?: number;
   private _refreshTimer?: number;
-  private _savedThemeColor?: string | null;
-  private _savedHtmlBg?: string;
   private _touchStartX = 0;
   private _touchStartY = 0;
   private _touchStartTime = 0;
@@ -461,48 +459,9 @@ export class HaImageGalleryCard extends LitElement {
       window.clearTimeout(this._zoomAnimationTimer);
       this._zoomAnimationTimer = undefined;
     }
-    // Restore page colors if dialog was open when component was removed
-    if (this._dialogOpen) {
-      const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-      if (this._savedThemeColor === null) { meta?.remove(); }
-      else if (meta && this._savedThemeColor !== undefined) { meta.content = this._savedThemeColor; }
-      document.documentElement.style.backgroundColor = this._savedHtmlBg ?? "";
-    }
   }
 
   protected willUpdate(changedProps: PropertyValues): void {
-    if (changedProps.has("_dialogOpen")) {
-      if (this._dialogOpen) {
-        // Darken the iOS status-bar (Dynamic Island area) to match the overlay background.
-        // Approach 1: theme-color meta tag (read by HA companion app for native status bar)
-        const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-        this._savedThemeColor = meta ? meta.content : undefined;
-        if (meta) {
-          meta.content = "rgb(5,11,18)";
-        } else {
-          const m = document.createElement("meta");
-          m.name = "theme-color";
-          m.content = "rgb(5,11,18)";
-          document.head.appendChild(m);
-          this._savedThemeColor = null;
-        }
-        // Approach 2: HTML background-color (fills safe-area inset regions outside the viewport)
-        this._savedHtmlBg = document.documentElement.style.backgroundColor || "";
-        document.documentElement.style.backgroundColor = "rgb(5,11,18)";
-      } else {
-        // Restore theme-color
-        const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-        if (this._savedThemeColor === null) {
-          meta?.remove();
-        } else if (meta && this._savedThemeColor !== undefined) {
-          meta.content = this._savedThemeColor;
-        }
-        this._savedThemeColor = undefined;
-        // Restore HTML background-color
-        document.documentElement.style.backgroundColor = this._savedHtmlBg ?? "";
-        this._savedHtmlBg = undefined;
-      }
-    }
     if (changedProps.has("_dialogOpen") && !this._dialogOpen) {
       this._resetZoom();
     }
