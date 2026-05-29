@@ -126,7 +126,8 @@ export class HaImageGalleryCard extends LitElement {
       font-size: 0.88rem;
       color: white;
       gap: 8px;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+      background: rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(2px);
       z-index: 10;
     }
 
@@ -307,11 +308,11 @@ export class HaImageGalleryCard extends LitElement {
         >
           ${this._renderMainContent()}
 
-          <div class="caption">
+          <div class="caption" @click=${this._stopEvent}>
             <div>${this._images.length ? this._getFileName(this._images[this._index]) : "-"}</div>
-            <div class="controls">
-              <button @click=${this._showPrevious} title="Vorheriges Bild" aria-label="Vorheriges Bild">&#8592;</button>
-              <button @click=${this._showNext} title="Nächstes Bild" aria-label="Nächstes Bild">&#8594;</button>
+            <div class="controls" @click=${this._stopEvent}>
+              <button @click=${this._showPreviousFromButton} title="Vorheriges Bild" aria-label="Vorheriges Bild">&#8592;</button>
+              <button @click=${this._showNextFromButton} title="Nächstes Bild" aria-label="Nächstes Bild">&#8594;</button>
             </div>
           </div>
         </div>
@@ -659,6 +660,20 @@ export class HaImageGalleryCard extends LitElement {
       return;
     }
     this._dialogOpen = true;
+  };
+
+  private _stopEvent = (event: Event): void => {
+    event.stopPropagation();
+  };
+
+  private _showPreviousFromButton = (event: Event): void => {
+    event.stopPropagation();
+    this._showPrevious();
+  };
+
+  private _showNextFromButton = (event: Event): void => {
+    event.stopPropagation();
+    this._showNext();
   };
 
   private _closeDialog = (): void => {
