@@ -1,4 +1,4 @@
-import { LitElement, css, html, PropertyValues, TemplateResult, CSSResult, render } from "lit";
+import { LitElement, css, html, PropertyValues, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { register } from "swiper/element/bundle";
 
@@ -76,8 +76,8 @@ export class HaImageGalleryCard extends LitElement {
   private _dialogZoomAnimate = false;
 
   private _zoomAnimationTimer?: number;
-  private _portalEl?: HTMLElement;
   private _refreshTimer?: number;
+  private _touchStartX = 0;
   private _touchStartY = 0;
   private _touchStartTime = 0;
 
@@ -459,10 +459,6 @@ export class HaImageGalleryCard extends LitElement {
       window.clearTimeout(this._zoomAnimationTimer);
       this._zoomAnimationTimer = undefined;
     }
-    if (this._portalEl) {
-      this._portalEl.remove();
-      this._portalEl = undefined;
-    }
   }
 
   protected willUpdate(changedProps: PropertyValues): void {
@@ -476,9 +472,6 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   protected updated(changedProps: PropertyValues): void {
-    // Keep the out-of-tree portal in sync on every update
-    this._syncPortal();
-
     if (changedProps.has("hass") && this._getEntityId()) {
       this._loadImagesFromEntity();
     }
@@ -520,6 +513,8 @@ export class HaImageGalleryCard extends LitElement {
           </div>
         </div>
       </ha-card>
+
+      ${this._dialogOpen ? this._renderDialog() : ""}
     `;
   }
 
@@ -977,37 +972,8 @@ export class HaImageGalleryCard extends LitElement {
   }
 
   private _getDialogSwiper(): SwiperLike | undefined {
-    const el = this._dialogRoot.querySelector(".dialog-swiper") as { swiper?: SwiperLike } | null;
+    const el = this.renderRoot?.querySelector(".dialog-swiper") as { swiper?: SwiperLike } | null;
     return el?.swiper;
-  }
-
-  /** Returns the shadow root that contains the dialog (portal or own shadow root). */
-  private get _dialogRoot(): ShadowRoot | ParentNode {
-    return (this._portalEl?.shadowRoot ?? this.renderRoot) as ShadowRoot | ParentNode;
-  }
-
-  /** Keeps the dialog portal in sync with component state.
-   *  Renders the dialog into a top-level <div> on <html> so that position:fixed
-   *  is never trapped by a containing-block ancestor in HA's layout tree. */
-  private _syncPortal(): void {
-    if (!this._dialogOpen) {
-      if (this._portalEl) {
-        this._portalEl.remove();
-        this._portalEl = undefined;
-      }
-      return;
-    }
-    if (!this._portalEl) {
-      const el = document.createElement("div");
-      el.attachShadow({ mode: "open" });
-      document.documentElement.appendChild(el);
-      this._portalEl = el;
-    }
-    const styleText = ((this.constructor as typeof HaImageGalleryCard).styles as CSSResult).cssText;
-    render(
-      html`<style>${styleText}</style>${this._renderDialog()}`,
-      this._portalEl.shadowRoot!
-    );
   }
 
   private _getActiveSwiper(): SwiperLike | undefined {
@@ -1510,7 +1476,7 @@ export class HaImageGalleryCard extends LitElement {
       return;
     }
     // Zoom towards the cursor: keep the image point under the cursor fixed
-    const stage = this._dialogRoot.querySelector(".overlay-stage") as HTMLElement | null;
+    const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
     if (stage) {
       const rect = stage.getBoundingClientRect();
       const cx = ev.clientX - (rect.left + rect.width / 2);
@@ -1541,7 +1507,7 @@ export class HaImageGalleryCard extends LitElement {
       this._pinchStartOffsetY = this._offsetY;
       this._isPinching = true;
       // Lock scroll immediately so Swiper doesn't start scrolling
-      const stage = this._dialogRoot.querySelector(".overlay-stage") as HTMLElement | null;
+      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
       if (stage) {
         const rect = stage.getBoundingClientRect();
         this._pinchStartMidX = (t1.clientX + t2.clientX) / 2 - (rect.left + rect.width / 2);
@@ -1579,7 +1545,7 @@ export class HaImageGalleryCard extends LitElement {
         this._offsetY = cy - (cy - this._pinchStartOffsetY) * newScale / this._pinchStartScale;
       }
       this._scale = newScale;
-      const stage = this._dialogRoot.querySelector(".overlay-stage") as HTMLElement | null;
+      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
       stage?.classList.toggle("zoom-locked", this._scale > 0.98);
       this.requestUpdate();
     } else if (ev.touches.length === 1 && this._scale > 1 && !this._isPinching) {
@@ -1593,7 +1559,7 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onDialogZoomTouchEnd = (ev: TouchEvent): void => {
-    const stage = this._dialogRoot.querySelector(".overlay-stage") as HTMLElement | null;
+    const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
 
     // Clear any pending animation timer
     if (this._zoomAnimationTimer) {
