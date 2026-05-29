@@ -372,7 +372,10 @@ export class HaImageGalleryCard extends LitElement {
           const result = await this._discoverImagesFromFolder(folder);
           images = result.images;
           if (!images.length && result.reason) {
-            this._error = result.reason;
+            this._error =
+              "Backend-Integration nicht aktiv (API /api/ha_imagegallery/images nicht erreichbar). " +
+              "Installiere zusaetzlich die Integration und starte Home Assistant neu. " +
+              result.reason;
           }
         }
       }

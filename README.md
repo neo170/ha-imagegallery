@@ -23,6 +23,15 @@ Custom Lovelace card for Home Assistant with backend folder monitoring. The inte
 4. Restart Home Assistant.
 5. Add the card in Lovelace.
 
+Important: HACS Dashboard installation only installs the Lovelace card JS.
+For folder watching and in-memory index, you must also install the backend integration files under `custom_components/ha_imagegallery`.
+
+Recommended setup:
+
+1. Install dashboard card via HACS (for Lovelace resource).
+2. Copy `custom_components/ha_imagegallery` from this repo to your HA config directory.
+3. Restart Home Assistant.
+
 ## Backend Integration Setup (required for folder watch)
 
 Copy folder `custom_components/ha_imagegallery` into your Home Assistant config directory and add this to `configuration.yaml`:
