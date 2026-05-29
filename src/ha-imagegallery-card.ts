@@ -248,7 +248,7 @@ export class HaImageGalleryCard extends LitElement {
       align-items: center;
       justify-content: space-between;
       padding: 8px 12px 10px;
-      font-size: 0.88rem;
+      font-size: 1.23rem;
       color: white;
       gap: 8px;
       background: rgba(0, 0, 0, 0.28);
@@ -257,7 +257,7 @@ export class HaImageGalleryCard extends LitElement {
 
     .controls {
       display: flex;
-      gap: 4px;
+      gap: 8px;
     }
 
     button {
@@ -265,10 +265,10 @@ export class HaImageGalleryCard extends LitElement {
       background: rgba(255, 255, 255, 0.08);
       color: inherit;
       border-radius: 999px;
-      width: 26px;
-      height: 26px;
+      width: 29px;
+      height: 29px;
       cursor: pointer;
-      font-size: 0.7rem;
+      font-size: 0.77rem;
       line-height: 1;
       padding: 0;
     }
@@ -393,7 +393,7 @@ export class HaImageGalleryCard extends LitElement {
       }
 
       .caption {
-        font-size: 0.82rem;
+        font-size: 1.15rem;
       }
     }
   `;
