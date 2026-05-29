@@ -81,6 +81,7 @@ export class HaImageGalleryCard extends LitElement {
   private _overlaySwipeStartX = 0;
   private _overlaySwipeDeltaX = 0;
   private _overlayIsSwiping = false;
+  private _overlaySwipeAnimating = false;
   private _lastTapTime = 0;
   private _lastTapX = 0;
   private _lastTapY = 0;
@@ -317,16 +318,20 @@ export class HaImageGalleryCard extends LitElement {
     }
 
     .close {
-      width: auto;
-      height: auto;
-      display: inline;
-      border: none;
-      background: none;
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
       padding: 0;
-      font-size: 2rem;
+      font-size: 2.1rem;
       color: white;
       cursor: pointer;
       line-height: 1;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
 
     @media (max-width: 650px) {
@@ -475,7 +480,7 @@ export class HaImageGalleryCard extends LitElement {
     return html`
       <div class="overlay" @wheel=${this._onWheelZoom}>
         <div class="overlay-top">
-          <button class="close" @click=${this._closeDialog} aria-label="Schliessen">✕</button>
+          <button class="close" @click=${this._closeDialog} @touchend=${this._closeDialogFromTouch} aria-label="Schliessen">✕</button>
           <div>${this._getFileName(currentImage)}</div>
         </div>
 
@@ -485,6 +490,8 @@ export class HaImageGalleryCard extends LitElement {
           @pointermove=${this._onOverlayPointerMove}
           @pointerup=${this._onOverlayPointerUp}
           @pointercancel=${this._onOverlayPointerUp}
+          @touchstart=${this._onOverlayTouchStart}
+          @touchmove=${this._onOverlayTouchMove}
           @touchend=${this._onOverlayTouchEnd}
           @dblclick=${this._onImageDoubleTap}
         >
@@ -835,6 +842,13 @@ export class HaImageGalleryCard extends LitElement {
     this._dialogOpen = false;
     this._activePointers.clear();
     this._dragging = false;
+    this._overlaySwipeIsIdle();
+  };
+
+  private _closeDialogFromTouch = (ev: TouchEvent): void => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this._closeDialog();
   };
 
   private _onViewportKeydown = (ev: KeyboardEvent): void => {
@@ -883,6 +897,10 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onOverlayPointerDown = (ev: PointerEvent): void => {
+    if (this._overlaySwipeAnimating) {
+      return;
+    }
+
     const stage = ev.currentTarget as HTMLElement;
     stage.setPointerCapture(ev.pointerId);
 
@@ -921,6 +939,10 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onOverlayPointerMove = (ev: PointerEvent): void => {
+    if (this._overlaySwipeAnimating) {
+      return;
+    }
+
     if (!this._activePointers.has(ev.pointerId)) {
       return;
     }
@@ -976,11 +998,12 @@ export class HaImageGalleryCard extends LitElement {
 
       // Handle horizontal swipe for image navigation at 1x zoom
       if (this._scale <= 1 && Math.abs(this._overlaySwipeDeltaX) > 60) {
-        if (this._overlaySwipeDeltaX < 0) {
-          this._showNext();
-        } else {
-          this._showPrevious();
-        }
+        const stage = ev.currentTarget as HTMLElement;
+        const trackDistance = stage.clientWidth + 16;
+        const direction = this._overlaySwipeDeltaX < 0 ? "next" : "prev";
+        const targetDelta = direction === "next" ? -trackDistance : trackDistance;
+        this._animateOverlaySwipeTo(targetDelta, direction);
+        return;
       }
 
       if (!wasSwiping && this._tapCandidate) {
@@ -997,11 +1020,53 @@ export class HaImageGalleryCard extends LitElement {
     }
   };
 
+  private _onOverlayTouchStart = (ev: TouchEvent): void => {
+    if (this._overlaySwipeAnimating || this._scale > 1 || ev.touches.length !== 1) {
+      return;
+    }
+    const touch = ev.touches[0];
+    if (!touch) {
+      return;
+    }
+    this._overlaySwipeStartX = touch.clientX;
+    this._overlaySwipeDeltaX = 0;
+    this._overlayIsSwiping = false;
+  };
+
+  private _onOverlayTouchMove = (ev: TouchEvent): void => {
+    if (this._overlaySwipeAnimating || this._scale > 1 || ev.touches.length !== 1) {
+      return;
+    }
+    const touch = ev.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    this._overlaySwipeDeltaX = touch.clientX - this._overlaySwipeStartX;
+    if (Math.abs(this._overlaySwipeDeltaX) > 8) {
+      this._overlayIsSwiping = true;
+      ev.preventDefault();
+    }
+  };
+
   private _onOverlayTouchEnd = (ev: TouchEvent): void => {
     const touch = ev.changedTouches[0];
     if (!touch) {
       return;
     }
+
+    if (this._scale <= 1 && Math.abs(this._overlaySwipeDeltaX) > 60) {
+      const stage = ev.currentTarget as HTMLElement;
+      const trackDistance = stage.clientWidth + 16;
+      const direction = this._overlaySwipeDeltaX < 0 ? "next" : "prev";
+      const targetDelta = direction === "next" ? -trackDistance : trackDistance;
+      this._overlayIsSwiping = false;
+      this._animateOverlaySwipeTo(targetDelta, direction);
+      return;
+    }
+
+    this._overlayIsSwiping = false;
+    this._overlaySwipeDeltaX = 0;
 
     const now = Date.now();
     const dt = now - this._lastTouchTapTime;
@@ -1017,6 +1082,39 @@ export class HaImageGalleryCard extends LitElement {
       this._lastTouchTapX = touch.clientX;
       this._lastTouchTapY = touch.clientY;
     }
+  };
+
+  private _animateOverlaySwipeTo = (targetDelta: number, direction: "next" | "prev"): void => {
+    if (this._overlaySwipeAnimating) {
+      return;
+    }
+
+    this._overlaySwipeAnimating = true;
+    this._overlayIsSwiping = false;
+    this._overlaySwipeDeltaX = targetDelta;
+    this.requestUpdate();
+
+    window.setTimeout(() => {
+      if (!this._images.length) {
+        this._overlaySwipeIsIdle();
+        return;
+      }
+
+      if (direction === "next") {
+        this._index = (this._index + 1) % this._images.length;
+      } else {
+        this._index = (this._index - 1 + this._images.length) % this._images.length;
+      }
+
+      this._overlaySwipeIsIdle();
+      this.requestUpdate();
+    }, 220);
+  };
+
+  private _overlaySwipeIsIdle = (): void => {
+    this._overlaySwipeAnimating = false;
+    this._overlayIsSwiping = false;
+    this._overlaySwipeDeltaX = 0;
   };
 
   private _handlePointerDoubleTap = (x: number, y: number, ev?: Event): void => {
