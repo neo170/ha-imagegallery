@@ -431,7 +431,7 @@ export class HaImageGalleryCard extends LitElement {
       this._restartRefreshTimer();
     }
     window.addEventListener("keydown", this._onKeyDown);
-    window.addEventListener("touchstart", this._onGlobalTouchStart, { capture: true, passive: true });
+    window.addEventListener("touchstart", this._onGlobalTouchStart, { capture: true, passive: false });
     window.addEventListener("touchmove", this._onGlobalTouchMove, { capture: true, passive: false });
   }
 
@@ -554,7 +554,7 @@ export class HaImageGalleryCard extends LitElement {
             class="dialog-swiper"
             slides-per-view="1"
             css-mode="false"
-            speed="260"
+            speed=${this._isIOSLikeDevice() ? "0" : "260"}
             loop="false"
             rewind="false"
             zoom="true"
@@ -1448,8 +1448,13 @@ export class HaImageGalleryCard extends LitElement {
 
     this._globalTouchStartX = touch.clientX;
     this._globalTouchStartY = touch.clientY;
-    const edge = 24;
-    this._globalEdgeGuardActive = touch.clientX <= edge || touch.clientX >= window.innerWidth - edge;
+    const edge = 50;
+    const isEdge = touch.clientX <= edge || touch.clientX >= window.innerWidth - edge;
+    this._globalEdgeGuardActive = isEdge;
+    if (isEdge) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
   };
 
   private _onGlobalTouchMove = (ev: TouchEvent): void => {
