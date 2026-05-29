@@ -1,0 +1,7 @@
+{
+  "name": "HA Image Gallery",
+  "render_readme": true,
+  "content_in_root": false,
+  "filename": "dist/ha-imagegallery-card.js",
+  "homeassistant": "2024.1.0"
+}

@@ -1,0 +1,31 @@
+{
+  "name": "ha-imagegallery",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Home Assistant custom Lovelace card for image galleries with swipe navigation and fullscreen pinch-to-zoom",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/ha-imagegallery-card.ts --bundle --minify --target=es2020 --format=esm --outfile=dist/ha-imagegallery-card.js",
+    "watch": "esbuild src/ha-imagegallery-card.ts --bundle --target=es2020 --format=esm --outfile=dist/ha-imagegallery-card.js --watch",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "ci": "npm run typecheck && npm run build"
+  },
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "hacs",
+    "custom-card",
+    "image-gallery"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "@typescript-eslint/parser": "^8.31.0",
+    "eslint": "^9.25.0",
+    "esbuild": "^0.25.3",
+    "lit": "^3.2.0",
+    "typescript": "^5.8.3"
+  }
+}
