@@ -78,6 +78,13 @@ export class HaImageGalleryCard extends LitElement {
   private _dragStartOffsetY = 0;
   private _isAnimating = false;
   private _swipeDirection: 'left' | 'right' | null = null;
+  private _cardSwipeStartX = 0;
+  private _cardSwipeStartY = 0;
+  private _cardSwipeStartTime = 0;
+  private _cardSwipeDeltaX = 0;
+  private _cardIsSwiping = false;
+  private _cardSwipeAnimating = false;
+  private _cardSuppressOpenUntil = 0;
   private _overlaySwipeStartX = 0;
   private _overlaySwipeDeltaX = 0;
   private _overlayIsSwiping = false;
@@ -121,72 +128,35 @@ export class HaImageGalleryCard extends LitElement {
       user-select: none;
     }
 
-    .viewport img {
+    .viewport-track {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      transition: transform 0.22s ease-out;
+      will-change: transform;
+      pointer-events: none;
+    }
+
+    .viewport-track.no-transition {
+      transition: none;
+    }
+
+    .viewport-slide {
+      width: 100%;
+      height: 100%;
+      flex: 0 0 100%;
+      overflow: hidden;
+    }
+
+    .viewport-slide img {
       width: 100%;
       height: 100%;
       object-fit: contain;
       display: block;
       background: rgba(0, 0, 0, 0.14);
-    }
-
-    @keyframes slideOutLeft {
-      from {
-        opacity: 1;
-        transform: translateX(0);
-      }
-      to {
-        opacity: 0;
-        transform: translateX(-30px);
-      }
-    }
-
-    @keyframes slideInRight {
-      from {
-        opacity: 0;
-        transform: translateX(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
-    }
-
-    @keyframes slideOutRight {
-      from {
-        opacity: 1;
-        transform: translateX(0);
-      }
-      to {
-        opacity: 0;
-        transform: translateX(30px);
-      }
-    }
-
-    @keyframes slideInLeft {
-      from {
-        opacity: 0;
-        transform: translateX(-30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(0);
-      }
-    }
-
-    .viewport img.slide-out-left {
-      animation: slideOutLeft 0.4s ease-out forwards;
-    }
-
-    .viewport img.slide-in-right {
-      animation: slideInRight 0.4s ease-out;
-    }
-
-    .viewport img.slide-out-right {
-      animation: slideOutRight 0.4s ease-out forwards;
-    }
-
-    .viewport img.slide-in-left {
-      animation: slideInLeft 0.4s ease-out;
     }
 
     .caption {
@@ -418,9 +388,11 @@ export class HaImageGalleryCard extends LitElement {
 
         <div
           class="viewport"
-          @touchstart=${this._onSwipeStart}
-          @touchend=${this._onSwipeEnd}
-          @click=${this._openDialog}
+          @touchstart=${this._onCardSwipeStart}
+          @touchmove=${this._onCardSwipeMove}
+          @touchend=${this._onCardSwipeEnd}
+          @touchcancel=${this._onCardSwipeEnd}
+          @click=${this._onViewportClick}
           role="button"
           tabindex="0"
           @keydown=${this._onViewportKeydown}
@@ -454,14 +426,24 @@ export class HaImageGalleryCard extends LitElement {
       return html`<div class="center">Keine Bilder gefunden</div>`;
     }
 
-    let className = '';
-    if (this._isAnimating && this._swipeDirection === 'left') {
-      className = 'slide-out-left';
-    } else if (this._isAnimating && this._swipeDirection === 'right') {
-      className = 'slide-out-right';
-    }
+    const prevIndex = (this._index - 1 + this._images.length) % this._images.length;
+    const nextIndex = (this._index + 1) % this._images.length;
+    const trackStyle = `transform: translateX(calc(-100% - 10px + ${this._cardSwipeDeltaX}px));`;
+    const trackClass = this._cardIsSwiping ? "viewport-track no-transition" : "viewport-track";
 
-    return html`<img src=${this._images[this._index]} alt="Gallery image" loading="lazy" class=${className} />`;
+    return html`
+      <div class=${trackClass} style=${trackStyle}>
+        <div class="viewport-slide">
+          <img src=${this._images[prevIndex]} alt="Vorheriges Bild" loading="lazy" />
+        </div>
+        <div class="viewport-slide">
+          <img src=${this._images[this._index]} alt="Gallery image" loading="lazy" />
+        </div>
+        <div class="viewport-slide">
+          <img src=${this._images[nextIndex]} alt="Naechstes Bild" loading="lazy" />
+        </div>
+      </div>
+    `;
   }
 
   private _renderDialog(): TemplateResult {
@@ -810,6 +792,15 @@ export class HaImageGalleryCard extends LitElement {
     this._dialogOpen = true;
   };
 
+  private _onViewportClick = (ev: MouseEvent): void => {
+    if (Date.now() < this._cardSuppressOpenUntil || this._cardIsSwiping || this._cardSwipeAnimating) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      return;
+    }
+    this._openDialog();
+  };
+
   private _animateSwipe = (direction: 'left' | 'right'): void => {
     this.requestUpdate();
     setTimeout(() => {
@@ -864,39 +855,97 @@ export class HaImageGalleryCard extends LitElement {
     }
   };
 
-  private _onSwipeStart = (ev: TouchEvent): void => {
+  private _onCardSwipeStart = (ev: TouchEvent): void => {
+    if (this._cardSwipeAnimating) {
+      return;
+    }
+
     const touch = ev.changedTouches[0];
     if (!touch) {
       return;
     }
-    this._touchStartX = touch.clientX;
-    this._touchStartY = touch.clientY;
-    this._touchStartTime = Date.now();
+    this._cardSwipeStartX = touch.clientX;
+    this._cardSwipeStartY = touch.clientY;
+    this._cardSwipeStartTime = Date.now();
+    this._cardSwipeDeltaX = 0;
+    this._cardIsSwiping = false;
   };
 
-  private _onSwipeEnd = (ev: TouchEvent): void => {
-    const touch = ev.changedTouches[0];
-    if (!touch || this._isAnimating) {
+  private _onCardSwipeMove = (ev: TouchEvent): void => {
+    if (this._cardSwipeAnimating) {
       return;
     }
 
-    const dx = touch.clientX - this._touchStartX;
-    const dy = touch.clientY - this._touchStartY;
-    const dt = Date.now() - this._touchStartTime;
+    const touch = ev.changedTouches[0];
+    if (!touch) {
+      return;
+    }
 
-    if (Math.abs(dx) > 45 && Math.abs(dy) < 60 && dt < 600) {
-      this._isAnimating = true;
-      if (dx < 0) {
-        this._swipeDirection = 'left';
-        this._animateSwipe('left');
-      } else {
-        this._swipeDirection = 'right';
-        this._animateSwipe('right');
-      }
+    const dx = touch.clientX - this._cardSwipeStartX;
+    const dy = touch.clientY - this._cardSwipeStartY;
+    if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+      this._cardIsSwiping = true;
+      this._cardSwipeDeltaX = dx;
+      ev.preventDefault();
     }
   };
 
+  private _onCardSwipeEnd = (ev: TouchEvent): void => {
+    const touch = ev.changedTouches[0];
+    if (!touch || this._cardSwipeAnimating) {
+      return;
+    }
+
+    const dx = touch.clientX - this._cardSwipeStartX;
+    const dy = touch.clientY - this._cardSwipeStartY;
+    const dt = Date.now() - this._cardSwipeStartTime;
+    const stage = ev.currentTarget as HTMLElement;
+    const travel = stage.clientWidth + 10;
+    const triggerByDistance = Math.abs(dx) > Math.max(42, stage.clientWidth * 0.17);
+    const triggerByVelocity = dt < 280 && Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy);
+
+    if (this._cardIsSwiping && (triggerByDistance || triggerByVelocity)) {
+      const direction: "next" | "prev" = dx < 0 ? "next" : "prev";
+      const target = direction === "next" ? -travel : travel;
+      this._cardSuppressOpenUntil = Date.now() + 300;
+      this._animateCardSwipeTo(target, direction);
+      return;
+    }
+
+    this._cardIsSwiping = false;
+    this._cardSwipeDeltaX = 0;
+  };
+
+  private _animateCardSwipeTo = (targetDelta: number, direction: "next" | "prev"): void => {
+    this._cardSwipeAnimating = true;
+    this._cardIsSwiping = false;
+    this._cardSwipeDeltaX = targetDelta;
+    this.requestUpdate();
+
+    window.setTimeout(() => {
+      if (!this._images.length) {
+        this._cardSwipeAnimating = false;
+        this._cardSwipeDeltaX = 0;
+        return;
+      }
+
+      if (direction === "next") {
+        this._index = (this._index + 1) % this._images.length;
+      } else {
+        this._index = (this._index - 1 + this._images.length) % this._images.length;
+      }
+
+      this._cardSwipeAnimating = false;
+      this._cardSwipeDeltaX = 0;
+      this.requestUpdate();
+    }, 220);
+  };
+
   private _onOverlayPointerDown = (ev: PointerEvent): void => {
+    if (ev.pointerType === "touch") {
+      return;
+    }
+
     if (this._overlaySwipeAnimating) {
       return;
     }
@@ -939,6 +988,10 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onOverlayPointerMove = (ev: PointerEvent): void => {
+    if (ev.pointerType === "touch") {
+      return;
+    }
+
     if (this._overlaySwipeAnimating) {
       return;
     }
@@ -985,6 +1038,10 @@ export class HaImageGalleryCard extends LitElement {
   };
 
   private _onOverlayPointerUp = (ev: PointerEvent): void => {
+    if (ev.pointerType === "touch") {
+      return;
+    }
+
     this._activePointers.delete(ev.pointerId);
 
     if (this._activePointers.size < 2) {
