@@ -1554,6 +1554,14 @@ export class HaImageGalleryCard extends LitElement {
       const t = ev.touches[0]!;
       this._offsetX = this._dragStartOffsetX + (t.clientX - this._dragStartPointerX);
       this._offsetY = this._dragStartOffsetY + (t.clientY - this._dragStartPointerY);
+      // Clamp so the image can't be dragged fully off-screen (prevents iOS black-tile bug)
+      const stage = this.renderRoot?.querySelector(".overlay-stage") as HTMLElement | null;
+      const stageW = stage?.clientWidth ?? window.innerWidth;
+      const stageH = stage?.clientHeight ?? window.innerHeight;
+      const maxX = (this._scale - 1) * stageW / 2;
+      const maxY = (this._scale - 1) * stageH / 2;
+      this._offsetX = this._clamp(this._offsetX, -maxX, maxX);
+      this._offsetY = this._clamp(this._offsetY, -maxY, maxY);
       this.requestUpdate();
     }
   };
