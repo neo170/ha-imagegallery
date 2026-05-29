@@ -247,8 +247,9 @@ export class HaImageGalleryCard extends LitElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px 10px;
-      font-size: 1.23rem;
+      padding: 6px 12px 8px;
+      font-size: 1.11rem;
+      font-weight: 600;
       color: white;
       gap: 8px;
       background: rgba(0, 0, 0, 0.28);
@@ -393,7 +394,7 @@ export class HaImageGalleryCard extends LitElement {
       }
 
       .caption {
-        font-size: 1.15rem;
+        font-size: 1.04rem;
       }
     }
   `;

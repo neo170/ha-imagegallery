@@ -235,8 +235,9 @@ var os=Object.defineProperty;var ls=Object.getOwnPropertyDescriptor;var J=(e,s,t
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 12px 10px;
-      font-size: 1.23rem;
+      padding: 6px 12px 8px;
+      font-size: 1.11rem;
+      font-weight: 600;
       color: white;
       gap: 8px;
       background: rgba(0, 0, 0, 0.28);
@@ -381,7 +382,7 @@ var os=Object.defineProperty;var ls=Object.getOwnPropertyDescriptor;var J=(e,s,t
       }
 
       .caption {
-        font-size: 1.15rem;
+        font-size: 1.04rem;
       }
     }
   `,J([st({attribute:!1})],Q.prototype,"hass",2),J([ae()],Q.prototype,"_config",2),J([ae()],Q.prototype,"_images",2),J([ae()],Q.prototype,"_index",2),J([ae()],Q.prototype,"_loading",2),J([ae()],Q.prototype,"_error",2),J([ae()],Q.prototype,"_dialogOpen",2),J([ae()],Q.prototype,"_scale",2),J([ae()],Q.prototype,"_offsetX",2),J([ae()],Q.prototype,"_offsetY",2),J([ae()],Q.prototype,"_dialogZoomAnimate",2),Q=J([Ot("ha-imagegallery-card")],Q);var Oe=class extends me{constructor(){super(...arguments);this._config={type:"custom:ha-imagegallery-card",entity:"camera.latest_snapshot",sort:"newest_first"}}setConfig(t){this._config={entity:"camera.latest_snapshot",sort:"newest_first",...t,type:"custom:ha-imagegallery-card"}}render(){return le`
