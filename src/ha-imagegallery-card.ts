@@ -78,6 +78,8 @@ export class HaImageGalleryCard extends LitElement {
   private _dragStartOffsetY = 0;
   private _isAnimating = false;
   private _swipeDirection: 'left' | 'right' | null = null;
+  private _overlaySwipeStartX = 0;
+  private _overlaySwipeDeltaX = 0;
 
   static styles = css`
     :host {
@@ -438,9 +440,8 @@ export class HaImageGalleryCard extends LitElement {
           @pointermove=${this._onOverlayPointerMove}
           @pointerup=${this._onOverlayPointerUp}
           @pointercancel=${this._onOverlayPointerUp}
-          @dblclick=${this._resetZoom}
         >
-          <img src=${currentImage} alt="Fullscreen image" style=${style} draggable="false" />
+          <img src=${currentImage} alt="Fullscreen image" style=${style} draggable="false" @dblclick=${this._onImageDoubleTap} />
         </div>
 
         <div class="overlay-bottom">
@@ -842,12 +843,18 @@ export class HaImageGalleryCard extends LitElement {
       return;
     }
 
-    if (this._activePointers.size === 1 && this._scale > 1) {
-      this._dragging = true;
-      this._dragStartPointerX = ev.clientX;
-      this._dragStartPointerY = ev.clientY;
-      this._dragStartOffsetX = this._offsetX;
-      this._dragStartOffsetY = this._offsetY;
+    if (this._activePointers.size === 1) {
+      if (this._scale > 1) {
+        this._dragging = true;
+        this._dragStartPointerX = ev.clientX;
+        this._dragStartPointerY = ev.clientY;
+        this._dragStartOffsetX = this._offsetX;
+        this._dragStartOffsetY = this._offsetY;
+      } else {
+        // Track horizontal swipe for image navigation at 1x zoom
+        this._overlaySwipeStartX = ev.clientX;
+        this._overlaySwipeDeltaX = 0;
+      }
     }
   };
 
@@ -877,6 +884,10 @@ export class HaImageGalleryCard extends LitElement {
     if (this._dragging && this._activePointers.size === 1 && this._scale > 1) {
       this._offsetX = this._dragStartOffsetX + (ev.clientX - this._dragStartPointerX);
       this._offsetY = this._dragStartOffsetY + (ev.clientY - this._dragStartPointerY);
+    } else if (this._activePointers.size === 1 && this._scale <= 1) {
+      // Horizontal swipe for navigation at 1x zoom
+      this._overlaySwipeDeltaX = ev.clientX - this._overlaySwipeStartX;
+      this._offsetX = this._overlaySwipeDeltaX * 0.5;
     }
   };
 
@@ -889,6 +900,16 @@ export class HaImageGalleryCard extends LitElement {
 
     if (this._activePointers.size === 0) {
       this._dragging = false;
+
+      // Handle horizontal swipe for image navigation at 1x zoom
+      if (this._scale <= 1 && Math.abs(this._overlaySwipeDeltaX) > 30) {
+        if (this._overlaySwipeDeltaX < 0) {
+          this._showNext();
+        } else {
+          this._showPrevious();
+        }
+      }
+      this._overlaySwipeDeltaX = 0;
     }
 
     if (this._scale <= 1) {
@@ -932,6 +953,10 @@ export class HaImageGalleryCard extends LitElement {
     if (ev.key === "ArrowRight") {
       this._showNext();
     }
+  };
+
+  private _onImageDoubleTap = (): void => {
+    this._resetZoom();
   };
 
   private _distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
