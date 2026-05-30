@@ -1122,7 +1122,7 @@ export class HaImageGalleryCard extends LitElement {
     const filename = src.split("/").pop() ?? src;
     const service = this._config.delete_service ?? "delete_snapshot";
 
-    this.hass.callService("shell_command", service, { filename });
+    void this.hass.callService("shell_command", service, { filename });
 
     // Remove image from local list
     const newImages = this._images.filter((_, i) => i !== this._index);
@@ -1133,6 +1133,15 @@ export class HaImageGalleryCard extends LitElement {
     }
     this._images = newImages;
     this._index = Math.min(this._index, this._images.length - 1);
+
+    // Wait for Lit to re-render the new slide set, then sync + update the dialog swiper
+    void this.updateComplete.then(() => {
+      this._syncSwipersToIndex(true);
+      const dialog = this._getDialogSwiper();
+      if (dialog) {
+        (dialog as SwiperLike & { update?: () => void }).update?.();
+      }
+    });
   }
 
   private _showPreviousFromTouch = (ev: TouchEvent): void => {
