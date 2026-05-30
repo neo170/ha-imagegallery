@@ -1121,8 +1121,12 @@ export class HaImageGalleryCard extends LitElement {
     const src = currentImage.split("?")[0] ?? currentImage;
     const filename = src.split("/").pop() ?? src;
     const service = this._config.delete_service ?? "delete_snapshot";
+    const deletePath = (this._config.delete_path ?? "/config/www/snapshots").replace(/\/$/, "");
 
-    void this.hass.callService("shell_command", service, { filename });
+    void this.hass.callService("shell_command", service, {
+      filename,
+      path: `${deletePath}/${filename}`,
+    });
 
     // Remove image from local list
     const newImages = this._images.filter((_, i) => i !== this._index);
