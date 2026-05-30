@@ -7,6 +7,7 @@ register();
 interface HomeAssistant {
   locale: { language: string };
   states?: Record<string, { attributes?: Record<string, unknown> }>;
+  callService(domain: string, service: string, data?: Record<string, unknown>): Promise<void>;
 }
 
 interface ImageGalleryCardConfig {
@@ -17,6 +18,8 @@ interface ImageGalleryCardConfig {
   entity?: string;
   refresh_interval?: number;
   sort?: "newest_first" | "oldest_first" | "none";
+  delete_path?: string;
+  delete_service?: string;
 }
 
 interface ConfigChangedEvent extends Event {
@@ -75,6 +78,10 @@ export class HaImageGalleryCard extends LitElement {
   @state()
   private _dialogZoomAnimate = false;
 
+  @state()
+  private _deleteConfirm = false;
+
+  private _deleteConfirmTimer?: number;
   private _zoomAnimationTimer?: number;
   private _refreshTimer?: number;
   private _touchStartX = 0;
@@ -394,6 +401,29 @@ export class HaImageGalleryCard extends LitElement {
       -webkit-tap-highlight-color: transparent;
     }
 
+    .delete {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 0;
+      font-size: 1.5rem;
+      color: white;
+      cursor: pointer;
+      line-height: 1;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .delete.confirm {
+      background: rgba(200, 40, 40, 0.55);
+      border-color: rgba(255, 100, 100, 0.7);
+    }
+
     @media (max-width: 650px) {
       .viewport {
         aspect-ratio: 16 / 9;
@@ -431,6 +461,8 @@ export class HaImageGalleryCard extends LitElement {
       folder: "/local/snapshots",
       refresh_interval: 15,
       sort: "newest_first",
+      delete_path: "/config/www/snapshots",
+      delete_service: "delete_snapshot",
       ...config
     };
 
@@ -458,6 +490,10 @@ export class HaImageGalleryCard extends LitElement {
     if (this._zoomAnimationTimer) {
       window.clearTimeout(this._zoomAnimationTimer);
       this._zoomAnimationTimer = undefined;
+    }
+    if (this._deleteConfirmTimer) {
+      window.clearTimeout(this._deleteConfirmTimer);
+      this._deleteConfirmTimer = undefined;
     }
   }
 
@@ -568,6 +604,12 @@ export class HaImageGalleryCard extends LitElement {
         <div class="overlay-top">
           <button class="close" @click=${this._closeDialog} @touchend=${this._closeDialogFromTouch} aria-label="Schliessen">✕</button>
           <div>${this._getFileName(currentImage)}</div>
+          <button
+            class="delete ${this._deleteConfirm ? 'confirm' : ''}"
+            @click=${this._onDeleteClick}
+            @touchend=${this._onDeleteTouchEnd}
+            aria-label="${this._deleteConfirm ? 'Löschen bestätigen' : 'Bild löschen'}"
+          >${this._deleteConfirm ? '✓' : '🗑'}</button>
         </div>
 
         <div class="overlay-stage ${(this._scale > 1 || this._dialogZoomAnimate) ? 'zoom-locked' : ''} ${this._dialogZoomAnimate ? 'zoom-animating' : ''}"
@@ -1042,6 +1084,56 @@ export class HaImageGalleryCard extends LitElement {
     ev.stopPropagation();
     this._closeDialog();
   };
+
+  private _onDeleteClick = (): void => {
+    if (!this._deleteConfirm) {
+      // First tap: enter confirm state, auto-cancel after 3 s
+      this._deleteConfirm = true;
+      if (this._deleteConfirmTimer) window.clearTimeout(this._deleteConfirmTimer);
+      this._deleteConfirmTimer = window.setTimeout(() => {
+        this._deleteConfirm = false;
+        this._deleteConfirmTimer = undefined;
+      }, 3000);
+    } else {
+      // Second tap: execute deletion
+      this._executeDelete();
+    }
+  };
+
+  private _onDeleteTouchEnd = (ev: TouchEvent): void => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this._onDeleteClick();
+  };
+
+  private _executeDelete(): void {
+    if (!this.hass || !this._config) return;
+    if (this._deleteConfirmTimer) {
+      window.clearTimeout(this._deleteConfirmTimer);
+      this._deleteConfirmTimer = undefined;
+    }
+    this._deleteConfirm = false;
+
+    const currentImage = this._images[this._index];
+    if (!currentImage) return;
+
+    // Extract raw basename (strip query string)
+    const src = currentImage.split("?")[0] ?? currentImage;
+    const filename = src.split("/").pop() ?? src;
+    const service = this._config.delete_service ?? "delete_snapshot";
+
+    this.hass.callService("shell_command", service, { filename });
+
+    // Remove image from local list
+    const newImages = this._images.filter((_, i) => i !== this._index);
+    if (newImages.length === 0) {
+      this._images = [];
+      this._closeDialog();
+      return;
+    }
+    this._images = newImages;
+    this._index = Math.min(this._index, this._images.length - 1);
+  }
 
   private _showPreviousFromTouch = (ev: TouchEvent): void => {
     ev.preventDefault();
