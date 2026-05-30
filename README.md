@@ -12,9 +12,7 @@ Folder watching and in-memory image indexing are provided by the separate integr
 - Pinch-to-zoom and pan in fullscreen (custom touch handling, works on iOS)
 - Double-tap to zoom in/out
 - Mouse wheel zoom on desktop (zoom towards cursor)
-- Rubber-band effect at zoom limits
 - Delete button in fullscreen overlay (two-tap confirmation, calls a configurable `shell_command`)
-- Safe-area / Dynamic Island aware (home indicator padding on iPhone)
 - Keyboard navigation (← → Esc)
 - Auto-refresh at configurable interval
 
@@ -27,7 +25,7 @@ Folder watching and in-memory image indexing are provided by the separate integr
 ## Required Backend
 
 Install the separate integration repository `ha-lastsnapshot` (HACS type: Integration).
-It exposes image URLs in `camera.latest_snapshot` attributes:
+It exposes image URLs in `camera.last_snapshot` attributes:
 
 - `images`
 - `latest_image`
@@ -41,7 +39,7 @@ You can configure the card directly in the Lovelace UI editor (visual editor).
 
 ```yaml
 type: custom:ha-imagegallery-card
-entity: camera.latest_snapshot
+entity: camera.last_snapshot
 title: Kamera Snapshots
 sort: newest_first
 ```
@@ -50,7 +48,7 @@ sort: newest_first
 
 ```yaml
 type: custom:ha-imagegallery-card
-entity: camera.latest_snapshot
+entity: camera.last_snapshot
 title: Kamera Snapshots
 sort: newest_first
 delete_path: /config/www/snapshots
@@ -68,14 +66,6 @@ The card passes two variables to the shell command:
 - `{{ path }}` — full filesystem path, e.g. `/config/www/snapshots/photo.jpg`
 - `{{ filename }}` — basename only, e.g. `photo.jpg`
 
-### Static image list (without backend)
-
-```yaml
-type: custom:ha-imagegallery-card
-images:
-  - /local/snapshots/frontdoor.jpg
-  - /local/snapshots/garage.jpg
-```
 
 ### Folder fallback (legacy)
 
@@ -85,19 +75,5 @@ folder: /local/snapshots
 refresh_interval: 60
 ```
 
-## Options
 
-| Option | Default | Description |
-|---|---|---|
-| `entity` | `camera.latest_snapshot` | Camera entity with `images` attribute |
-| `images` | — | Explicit image URL list |
-| `folder` | `/local/snapshots` | Fallback folder source |
-| `refresh_interval` | `15` | Refresh interval in seconds (folder mode) |
-| `sort` | `newest_first` | `newest_first`, `oldest_first`, `none` |
-| `title` | `Image Gallery` | Card title |
-| `delete_path` | `/config/www/snapshots` | Filesystem path passed to the delete shell command |
-| `delete_service` | `delete_snapshot` | Name of the `shell_command` service to call on delete |
 
-## License
-
-MIT
